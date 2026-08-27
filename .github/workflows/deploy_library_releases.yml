@@ -1,8 +1,8 @@
 name: Release library subprojects
 on:
-  push:
-    tags:
-      - autofill-parser-v*
+  # Disabled for this fork: publishes to Maven Central; needs secrets.NEXUS_PUBLISH_*.
+  # Left as manual-only so the definition is preserved; re-add triggers if needed.
+  workflow_dispatch:
 
 jobs:
   publish-release:

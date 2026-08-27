@@ -40,8 +40,8 @@ import app.passwordstore.util.extensions.unsafeLazy
 import app.passwordstore.util.extensions.viewBinding
 import app.passwordstore.util.settings.DirectoryStructure
 import app.passwordstore.util.settings.PreferenceKeys
-import com.github.michaelbull.result.onFailure
-import com.github.michaelbull.result.onSuccess
+import com.github.michaelbull.result.onErr
+import com.github.michaelbull.result.onOk
 import com.github.michaelbull.result.runCatching
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.zxing.BinaryBitmap
@@ -94,7 +94,7 @@ class PasswordCreationActivity : BasePGPActivity() {
         binding.otpImportButton.isVisible = false
         val intentResult = IntentIntegrator.parseActivityResult(RESULT_OK, result.data)
         val contents = "${intentResult.contents}\n"
-        val currentExtras = binding.extraContent.text.toString()
+        val currentExtras = binding.extraContent.text?.toString().orEmpty()
         if (currentExtras.isNotEmpty() && currentExtras.last() != '\n')
           binding.extraContent.append("\n$contents")
         else binding.extraContent.append(contents)
@@ -127,14 +127,14 @@ class PasswordCreationActivity : BasePGPActivity() {
       runCatching {
           val result = reader.decode(binaryBitmap)
           val text = result.text
-          val currentExtras = binding.extraContent.text.toString()
+          val currentExtras = binding.extraContent.text?.toString().orEmpty()
           if (currentExtras.isNotEmpty() && currentExtras.last() != '\n')
             binding.extraContent.append("\n$text")
           else binding.extraContent.append(text)
           snackbar(message = getString(R.string.otp_import_success))
           binding.otpImportButton.isVisible = false
         }
-        .onFailure { snackbar(message = getString(R.string.otp_import_failure_generic)) }
+        .onErr { snackbar(message = getString(R.string.otp_import_failure_generic)) }
     }
 
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -152,7 +152,7 @@ class PasswordCreationActivity : BasePGPActivity() {
         ) { requestKey, bundle ->
           if (requestKey == OTP_RESULT_REQUEST_KEY) {
             val contents = bundle.getString(RESULT)
-            val currentExtras = binding.extraContent.text.toString()
+            val currentExtras = binding.extraContent.text?.toString().orEmpty()
             if (currentExtras.isNotEmpty() && currentExtras.last() != '\n')
               binding.extraContent.append("\n$contents")
             else binding.extraContent.append(contents)
@@ -230,14 +230,14 @@ class PasswordCreationActivity : BasePGPActivity() {
             if (isChecked) {
               // User wants to enable username encryption, so we use the filename
               // as username and insert it into the username input field.
-              val login = filename.text.toString()
+              val login = filename.text?.toString().orEmpty()
               filename.text?.clear()
               username.setText(login)
               usernameInputLayout.apply { visibility = View.VISIBLE }
             } else {
               // User wants to disable username encryption, so we take the username
               // from the username text field and insert it into the filename input field.
-              val login = username.text.toString()
+              val login = username.text?.toString().orEmpty()
               username.text?.clear()
               filename.setText(login)
               usernameInputLayout.apply { visibility = View.GONE }
@@ -305,8 +305,8 @@ class PasswordCreationActivity : BasePGPActivity() {
     with(binding) {
       encryptUsername.apply {
         if (visibility != View.VISIBLE) return@apply
-        val hasUsernameInFileName = filename.text.toString().isNotBlank()
-        val usernameIsEncrypted = username.text.toString().isNotEmpty()
+        val hasUsernameInFileName = filename.text?.toString().orEmpty().isNotBlank()
+        val usernameIsEncrypted = username.text?.toString().orEmpty().isNotEmpty()
         isEnabled = hasUsernameInFileName xor usernameIsEncrypted
         isChecked = usernameIsEncrypted
       }
@@ -320,10 +320,10 @@ class PasswordCreationActivity : BasePGPActivity() {
   private fun encrypt() {
     with(binding) {
       val oldName = suggestedName
-      val editName = filename.text.toString().trim()
-      var editUsername = username.text.toString()
-      val editPass = password.text.toString()
-      val editExtra = extraContent.text.toString()
+      val editName = filename.text?.toString().orEmpty().trim()
+      var editUsername = username.text?.toString().orEmpty()
+      val editPass = password.text?.toString().orEmpty()
+      val editExtra = extraContent.text?.toString().orEmpty()
 
       if (editName.isEmpty()) {
         snackbar(message = resources.getString(R.string.file_toast_text))
@@ -347,14 +347,14 @@ class PasswordCreationActivity : BasePGPActivity() {
       }
 
       // pass enters the key ID into `.gpg-id`.
-      val gpgIdentifiers = getPGPIdentifiers(directory.text.toString()) ?: return@with
+      val gpgIdentifiers = getPGPIdentifiers(directory.text?.toString().orEmpty()) ?: return@with
       val content = "$editPass$editUsername\n$editExtra"
       val path =
         when {
           // If we allowed the user to edit the relative path, we have to consider it here
           // instead of fullPath.
           directoryInputLayout.isEnabled -> {
-            val editRelativePath = directory.text.toString().trim()
+            val editRelativePath = directory.text?.toString().orEmpty().trim()
             if (editRelativePath.isEmpty()) {
               snackbar(message = resources.getString(R.string.path_toast_text))
               return
@@ -453,13 +453,13 @@ class PasswordCreationActivity : BasePGPActivity() {
               commitChange(
                   resources.getString(commitMessageRes, getLongName(fullPath, repoPath, editName))
                 )
-                .onSuccess {
+                .onOk {
                   setResult(RESULT_OK, returnIntent)
                   finish()
                 }
             }
           }
-          .onFailure { e ->
+          .onErr { e ->
             if (e is IOException) {
               logcat(ERROR) { e.asLog("Failed to write password file") }
               setResult(RESULT_CANCELED)

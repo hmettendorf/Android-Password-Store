@@ -15,7 +15,9 @@ import app.passwordstore.crypto.PGPKey
 import app.passwordstore.crypto.PGPKeyManager
 import app.passwordstore.crypto.errors.KeyAlreadyExistsException
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.getOrThrow
 import com.github.michaelbull.result.runCatching
+import com.github.michaelbull.result.unwrapError
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -68,7 +70,7 @@ class PGPKeyImportActivity : AppCompatActivity() {
 
   private fun handleImportResult(result: Result<PGPKey?, Throwable>) {
     if (result.isOk) {
-      val key = result.value
+      val key = result.getOrThrow()
       if (key == null) {
         setResult(RESULT_CANCELED)
         finish()
@@ -86,7 +88,8 @@ class PGPKeyImportActivity : AppCompatActivity() {
         .setCancelable(false)
         .show()
     } else {
-      if (result.error is KeyAlreadyExistsException && lastBytes != null) {
+      val error = result.unwrapError()
+      if (error is KeyAlreadyExistsException && lastBytes != null) {
         MaterialAlertDialogBuilder(this)
           .setTitle(getString(R.string.pgp_key_import_failed))
           .setMessage(getString(R.string.pgp_key_import_failed_replace_message))
@@ -99,7 +102,7 @@ class PGPKeyImportActivity : AppCompatActivity() {
       } else {
         MaterialAlertDialogBuilder(this)
           .setTitle(getString(R.string.pgp_key_import_failed))
-          .setMessage(result.error.message)
+          .setMessage(error.message)
           .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
           .setCancelable(false)
           .show()

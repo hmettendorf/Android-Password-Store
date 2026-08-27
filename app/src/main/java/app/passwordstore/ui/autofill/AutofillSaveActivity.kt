@@ -12,7 +12,6 @@ import android.os.Bundle
 import android.view.autofill.AutofillManager
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.os.bundleOf
 import app.passwordstore.data.repo.PasswordRepository
 import app.passwordstore.ui.crypto.PasswordCreationActivity
 import app.passwordstore.util.autofill.AutofillMatcher
@@ -68,16 +67,20 @@ class AutofillSaveActivity : AppCompatActivity() {
       val intent =
         Intent(context, AutofillSaveActivity::class.java).apply {
           putExtras(
-            bundleOf(
-              EXTRA_FOLDER_NAME to folderName,
-              EXTRA_NAME to fileName,
-              EXTRA_PASSWORD to credentials?.password,
-              EXTRA_SHOULD_MATCH_APP to
+            Bundle().apply {
+              putString(EXTRA_FOLDER_NAME, folderName)
+              putString(EXTRA_NAME, fileName)
+              putString(EXTRA_PASSWORD, credentials?.password)
+              putString(
+                EXTRA_SHOULD_MATCH_APP,
                 formOrigin.identifier.takeIf { formOrigin is FormOrigin.App },
-              EXTRA_SHOULD_MATCH_WEB to
+              )
+              putString(
+                EXTRA_SHOULD_MATCH_WEB,
                 formOrigin.identifier.takeIf { formOrigin is FormOrigin.Web },
-              EXTRA_GENERATE_PASSWORD to (credentials == null),
-            )
+              )
+              putBoolean(EXTRA_GENERATE_PASSWORD, credentials == null)
+            }
           )
         }
       return PendingIntent.getActivity(
@@ -108,14 +111,22 @@ class AutofillSaveActivity : AppCompatActivity() {
     val saveIntent =
       Intent(this, PasswordCreationActivity::class.java).apply {
         putExtras(
-          bundleOf(
-            "REPO_PATH" to repo.absolutePath,
-            "FILE_PATH" to repo.resolve(intent.getStringExtra(EXTRA_FOLDER_NAME)!!).absolutePath,
-            PasswordCreationActivity.EXTRA_FILE_NAME to intent.getStringExtra(EXTRA_NAME),
-            PasswordCreationActivity.EXTRA_PASSWORD to intent.getStringExtra(EXTRA_PASSWORD),
-            PasswordCreationActivity.EXTRA_GENERATE_PASSWORD to
+          Bundle().apply {
+            putString("REPO_PATH", repo.absolutePath)
+            putString(
+              "FILE_PATH",
+              repo.resolve(intent.getStringExtra(EXTRA_FOLDER_NAME)!!).absolutePath,
+            )
+            putString(PasswordCreationActivity.EXTRA_FILE_NAME, intent.getStringExtra(EXTRA_NAME))
+            putString(
+              PasswordCreationActivity.EXTRA_PASSWORD,
+              intent.getStringExtra(EXTRA_PASSWORD),
+            )
+            putBoolean(
+              PasswordCreationActivity.EXTRA_GENERATE_PASSWORD,
               intent.getBooleanExtra(EXTRA_GENERATE_PASSWORD, false),
-          )
+            )
+          }
         )
       }
     registerForActivityResult(StartActivityForResult()) { result ->

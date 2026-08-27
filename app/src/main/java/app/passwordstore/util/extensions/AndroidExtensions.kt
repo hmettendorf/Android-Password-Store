@@ -48,6 +48,9 @@ val Context.clipboard
 fun Context.getEncryptedGitPrefs() = getEncryptedPrefs("git_operation")
 
 /** Get an instance of [EncryptedSharedPreferences] with the given [fileName] */
+// androidx.security:security-crypto is deprecated in 1.1.0 with no AndroidX replacement.
+// Suppressed to keep storage behaviour unchanged; replacing it is tracked separately.
+@Suppress("DEPRECATION")
 private fun Context.getEncryptedPrefs(fileName: String): SharedPreferences {
   val masterKeyAlias =
     MasterKey.Builder(applicationContext).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()

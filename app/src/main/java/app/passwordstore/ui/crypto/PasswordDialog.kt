@@ -10,7 +10,6 @@ import android.content.DialogInterface
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
-import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.DialogFragment
@@ -77,10 +76,13 @@ class PasswordDialog : DialogFragment() {
   }
 
   private fun setPasswordAndDismiss() {
-    val password = binding.passwordEditText.text.toString()
+    val password = binding.passwordEditText.text?.toString().orEmpty()
     setFragmentResult(
       PASSWORD_RESULT_KEY,
-      bundleOf(PASSWORD_PHRASE_KEY to password, PASSWORD_CLEAR_KEY to clearCacheChecked),
+      Bundle().apply {
+        putString(PASSWORD_PHRASE_KEY, password)
+        putBoolean(PASSWORD_CLEAR_KEY, clearCacheChecked)
+      },
     )
     dismissAllowingStateLoss()
   }
@@ -96,7 +98,10 @@ class PasswordDialog : DialogFragment() {
 
     fun newInstance(cacheEnabled: Boolean, clearCache: Boolean): PasswordDialog {
       val extras =
-        bundleOf(CACHE_ENABLED_EXTRA to cacheEnabled, AUTO_CLEAR_CACHE_EXTRA to clearCache)
+        Bundle().apply {
+          putBoolean(CACHE_ENABLED_EXTRA, cacheEnabled)
+          putBoolean(AUTO_CLEAR_CACHE_EXTRA, clearCache)
+        }
       val fragment = PasswordDialog()
       fragment.arguments = extras
       return fragment

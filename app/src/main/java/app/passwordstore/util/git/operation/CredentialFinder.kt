@@ -93,7 +93,7 @@ class CredentialFinder(
           setMessage(messageRes)
           setView(dialogView)
           setPositiveButton(R.string.dialog_ok) { _, _ ->
-            val credential = editCredential.text.toString()
+            val credential = editCredential.text?.toString().orEmpty()
             if (rememberCredential.isChecked) {
               gitOperationPrefs.edit { putString(credentialPref, credential) }
             }

@@ -218,7 +218,7 @@ class AutofillFilterView : AppCompatActivity() {
 
   private fun updateSearch() {
     model.search(
-      binding.search.text.toString().trim(),
+      binding.search.text?.toString().orEmpty().trim(),
       filterMode =
         if (binding.strictDomainSearch.isChecked) FilterMode.StrictDomain else FilterMode.Fuzzy,
       searchMode = SearchMode.RecursivelyInSubdirectories,

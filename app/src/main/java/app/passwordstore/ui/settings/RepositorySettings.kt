@@ -29,7 +29,7 @@ import app.passwordstore.util.extensions.unsafeLazy
 import app.passwordstore.util.git.sshj.SshKey
 import app.passwordstore.util.settings.GitSettings
 import app.passwordstore.util.settings.PreferenceKeys
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.runCatching
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.EntryPoint
@@ -167,7 +167,7 @@ class RepositorySettings(private val activity: FragmentActivity) : SettingsProvi
                     dir.mkdirs()
                   }
                 }
-                .onFailure { it.message?.let { message -> activity.snackbar(message = message) } }
+                .onErr { it.message?.let { message -> activity.snackbar(message = message) } }
 
               activity.getSystemService<ShortcutManager>()?.apply {
                 removeDynamicShortcuts(dynamicShortcuts.map { it.id }.toMutableList())

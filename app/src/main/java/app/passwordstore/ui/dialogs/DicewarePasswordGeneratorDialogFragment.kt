@@ -11,7 +11,6 @@ import android.content.SharedPreferences
 import android.graphics.Typeface
 import android.os.Bundle
 import androidx.core.content.edit
-import androidx.core.os.bundleOf
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.setFragmentResult
 import androidx.lifecycle.lifecycleScope
@@ -59,7 +58,9 @@ class DicewarePasswordGeneratorDialogFragment : DialogFragment() {
         setPositiveButton(R.string.dialog_ok) { _, _ ->
           setFragmentResult(
             PasswordCreationActivity.PASSWORD_RESULT_REQUEST_KEY,
-            bundleOf(PasswordCreationActivity.RESULT to "${binding.passwordText.text}"),
+            Bundle().apply {
+              putString(PasswordCreationActivity.RESULT, "${binding.passwordText.text}")
+            },
           )
         }
         setNeutralButton(R.string.dialog_cancel) { _, _ -> }

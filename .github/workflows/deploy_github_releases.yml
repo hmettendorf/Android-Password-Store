@@ -1,8 +1,8 @@
 name: Publish APS binaries to GitHub Releases
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+  # Disabled for this fork: needs secrets.ENCRYPT_KEY (upstream signing keystore).
+  # Left as manual-only so the definition is preserved; re-add triggers if needed.
+  workflow_dispatch:
 
 jobs:
   build:

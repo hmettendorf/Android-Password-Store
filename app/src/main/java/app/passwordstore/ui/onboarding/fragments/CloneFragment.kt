@@ -21,7 +21,7 @@ import app.passwordstore.util.extensions.sharedPrefs
 import app.passwordstore.util.extensions.unsafeLazy
 import app.passwordstore.util.extensions.viewBinding
 import app.passwordstore.util.settings.PreferenceKeys
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.runCatching
 import logcat.LogPriority.ERROR
 import logcat.asLog
@@ -62,7 +62,7 @@ class CloneFragment : Fragment(R.layout.fragment_clone) {
         }
         parentFragmentManager.performTransactionWithBackStack(KeySelectionFragment.newInstance())
       }
-      .onFailure { e ->
+      .onErr { e ->
         logcat(ERROR) { e.asLog() }
         if (!localDir.delete()) {
           logcat { "Failed to delete local repository: $localDir" }

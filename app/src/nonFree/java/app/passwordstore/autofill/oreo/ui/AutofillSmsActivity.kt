@@ -23,7 +23,7 @@ import app.passwordstore.util.coroutines.DispatcherProvider
 import app.passwordstore.util.extensions.viewBinding
 import com.github.androidpasswordstore.autofillparser.AutofillAction
 import com.github.androidpasswordstore.autofillparser.Credentials
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.runCatching
 import com.google.android.gms.auth.api.phone.SmsCodeRetriever
 import com.google.android.gms.auth.api.phone.SmsRetriever
@@ -140,7 +140,7 @@ class AutofillSmsActivity : AppCompatActivity() {
           smsClient.startSmsCodeRetriever().suspendableAwait()
         }
       }
-      .onFailure { e ->
+      .onErr { e ->
         if (e is ResolvableApiException) {
           e.startResolutionForResult(this@AutofillSmsActivity, 1)
         } else {

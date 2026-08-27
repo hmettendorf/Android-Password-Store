@@ -40,6 +40,9 @@ class PGPPassphraseCache @Inject constructor(private val dispatcherProvider: Dis
     withContext(dispatcherProvider.io()) { getPreferences(context).edit { clear() } }
   }
 
+  // androidx.security:security-crypto is deprecated in 1.1.0 with no AndroidX replacement.
+  // Suppressed to keep storage behaviour unchanged; replacing it is tracked separately.
+  @Suppress("DEPRECATION")
   private suspend fun getPreferences(context: Context) =
     withContext(dispatcherProvider.io()) {
       EncryptedSharedPreferences.create(
@@ -51,6 +54,9 @@ class PGPPassphraseCache @Inject constructor(private val dispatcherProvider: Dis
       )
     }
 
+  // androidx.security:security-crypto is deprecated in 1.1.0 with no AndroidX replacement.
+  // Suppressed to keep storage behaviour unchanged; replacing it is tracked separately.
+  @Suppress("DEPRECATION")
   private suspend fun getOrCreateWrappingMasterKey(context: Context) =
     withContext(dispatcherProvider.io()) {
       MasterKey.Builder(context, "passphrase")

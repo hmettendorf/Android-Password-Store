@@ -1,8 +1,8 @@
 name: Update Publix Suffix List data
 on:
+  # Disabled for this fork: needs secrets.PSL_UPDATE_TOKEN.
+  # Left as manual-only so the definition is preserved; re-add triggers if needed.
   workflow_dispatch:
-  schedule:
-    - cron: "0 0 * * 1"
 
 jobs:
   update-publicsuffix-data:

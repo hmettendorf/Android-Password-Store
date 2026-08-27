@@ -26,7 +26,7 @@ import app.passwordstore.util.settings.AuthMode
 import app.passwordstore.util.settings.GitSettings
 import app.passwordstore.util.settings.Protocol
 import com.github.michaelbull.result.fold
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.runCatching
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
@@ -100,7 +100,7 @@ class GitServerConfigActivity : BaseGitActivity() {
       it.isVisible = false
     }
     binding.saveButton.setOnClickListener {
-      val newUrl = binding.serverUrl.text.toString().trim()
+      val newUrl = binding.serverUrl.text?.toString().orEmpty().trim()
       // If url is of type john_doe@example.org:12435/path/to/repo, then not adding `ssh://`
       // in the beginning will cause the port to be seen as part of the path. Let users know
       // about it and offer a quickfix.
@@ -140,7 +140,7 @@ class GitServerConfigActivity : BaseGitActivity() {
         val updateResult =
           gitSettings.updateConnectionSettingsIfValid(
             newAuthMode = newAuthMode,
-            newUrl = binding.serverUrl.text.toString().trim(),
+            newUrl = binding.serverUrl.text?.toString().orEmpty().trim(),
           )
       ) {
         GitSettings.UpdateConnectionSettingsResult.FailedToParseUrl -> {
@@ -259,7 +259,7 @@ class GitServerConfigActivity : BaseGitActivity() {
                   )
               }
             }
-            .onFailure { e ->
+            .onErr { e ->
               e.printStackTrace()
               MaterialAlertDialogBuilder(this).setMessage(e.message).show()
             }
@@ -274,7 +274,7 @@ class GitServerConfigActivity : BaseGitActivity() {
             localDir.deleteRecursively()
           }
         }
-        .onFailure { e ->
+        .onErr { e ->
           logcat(ERROR) { e.asLog() }
           MaterialAlertDialogBuilder(this).setMessage(e.message).show()
         }
