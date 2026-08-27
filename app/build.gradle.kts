@@ -50,6 +50,7 @@ dependencies {
   implementation(libs.androidx.biometricKtx)
   implementation(libs.androidx.constraintlayout)
   implementation(libs.androidx.core.ktx)
+  implementation(libs.androidx.datastore.preferences)
   implementation(libs.androidx.documentfile)
   implementation(libs.androidx.fragment.ktx)
   implementation(libs.bundles.androidxLifecycle)
