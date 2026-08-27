@@ -63,6 +63,14 @@ class DecryptActivity : BasePGPActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    // Exported for launcher shortcuts, so the path is attacker-reachable. Check it before
+    // anything reads the file or prompts the user for a passphrase.
+    if (!isPathInRepository(fullPath)) {
+      logcat(ERROR) { "Refusing to decrypt a file outside the password store" }
+      setResult(RESULT_CANCELED)
+      finish()
+      return
+    }
     supportActionBar?.setDisplayHomeAsUpEnabled(true)
     title = name
     with(binding) {

@@ -35,7 +35,9 @@ class PublishedAndroidLibraryPlugin : Plugin<Project> {
     }
     project.extensions.configure<MetalavaExtension> {
       inputKotlinNulls.set(true)
-      reportLintsAsErrors.set(true)
+      // reportLintsAsErrors is not set: it passes --lints-as-errors, which metalava dropped by
+      // 1.0.0-alpha14 (the version this plugin resolves). --warnings-as-errors still covers the
+      // lints that are reported as warnings.
       reportWarningsAsErrors.set(true)
     }
   }

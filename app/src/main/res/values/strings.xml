@@ -191,6 +191,9 @@
   <string name="biometric_prompt_title_ssh_keygen">Generate SSH key</string>
 
   <!-- Misc -->
+  <string name="host_key_verification_title">Unknown server</string>
+  <string name="host_key_verification_message">You have not connected to %1$s before.\n\nIts key fingerprint is:\n%2$s\n\nCheck this against the fingerprint published by your Git host. If it does not match, someone may be intercepting the connection.</string>
+  <string name="host_key_verification_trust">Trust</string>
   <string name="dialog_ok">OK</string>
   <string name="dialog_yes">Yes</string>
   <string name="dialog_no">No</string>

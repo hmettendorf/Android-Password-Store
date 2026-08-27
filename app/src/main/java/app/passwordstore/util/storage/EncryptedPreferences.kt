@@ -47,6 +47,7 @@ class EncryptedPreferences(
 ) : SharedPreferences {
 
   private val appContext = context.applicationContext
+  private val name = storeName
 
   private val dataStore: DataStore<Preferences> =
     PreferenceDataStoreFactory.create(scope = scope) {
@@ -65,26 +66,55 @@ class EncryptedPreferences(
   /**
    * Loads and decrypts the store into memory. Safe to call repeatedly. Synchronous readers block on
    * this only if they arrive before the background warm-up finishes.
+   *
+   * A failure that might succeed later -- the key is fine but the user's authentication window has
+   * closed -- leaves the store un-warmed so the next read tries again. Only a permanent failure
+   * settles the store into whatever could be read.
    */
   @Synchronized
   fun warm() {
     if (warmed) return
-    runCatching {
-        val stored = runBlocking { dataStore.data.first() }
-        cache.clear()
-        stored.asMap().forEach { (key, value) ->
-          val encoded = value as? String ?: return@forEach
-          runCatching { decode(encoded) }
-            .onSuccess { cache[key.name] = it }
-            .onFailure { error ->
-              // A single unreadable entry must not take the whole store down with it.
-              logcat(ERROR) { "Dropping unreadable entry '${key.name}': ${error.asLog()}" }
-            }
+    val stored =
+      runCatching { runBlocking { dataStore.data.first() } }
+        .getOrElse { error ->
+          logcat(ERROR) { "Failed to load encrypted store '$name': ${error.asLog()}" }
+          return
         }
+
+    val decoded = HashMap<String, String>(stored.asMap().size)
+    val unreadable = mutableListOf<String>()
+    for ((key, value) in stored.asMap()) {
+      val encoded = value as? String ?: continue
+      try {
+        decoded[key.name] = decode(encoded)
+      } catch (e: KeyAuthenticationRequiredException) {
+        // Retryable. Warming now would cache an empty store for the life of the process.
+        logcat(ERROR) { "Store '$name' is locked, deferring load: ${e.asLog()}" }
+        return
+      } catch (e: Throwable) {
+        // A single unreadable entry must not take the whole store down with it.
+        logcat(ERROR) { "Dropping unreadable entry '${key.name}': ${e.asLog()}" }
+        unreadable += key.name
       }
-      .onFailure { error -> logcat(ERROR) { "Failed to load encrypted store: ${error.asLog()}" } }
+    }
+
+    cache.clear()
+    cache.putAll(decoded)
     warmed = true
+    if (unreadable.isNotEmpty()) {
+      lostEntries = unreadable.toList()
+      // Loud on purpose: these are credentials the user set and will now be silently asked for
+      // again, which is otherwise indistinguishable from never having set them.
+      logcat(ERROR) {
+        "Store '$name' lost ${unreadable.size} entries to an unusable key: ${unreadable.joinToString()}"
+      }
+    }
   }
+
+  /** Names of entries that existed but could not be decrypted during the last [warm]. */
+  @Volatile
+  var lostEntries: List<String> = emptyList()
+    private set
 
   private fun ensureWarm() {
     if (!warmed) warm()

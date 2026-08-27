@@ -147,6 +147,22 @@ open class BasePGPActivity : AppCompatActivity() {
   }
 
   /**
+   * Whether [path] names a file inside the password repository.
+   *
+   * [app.passwordstore.ui.crypto.DecryptActivity] is exported so launcher shortcuts can reach it,
+   * which means the Intent that starts it does not have to come from this app. Canonicalising both
+   * sides stops `..` segments and symlinks from pointing the decryption machinery at a file the
+   * user never put in their store.
+   */
+  fun isPathInRepository(path: String): Boolean =
+    runCatching {
+        val repoRoot = PasswordRepository.getRepositoryDirectory().canonicalFile.toPath()
+        val target = File(path).canonicalFile.toPath()
+        target != repoRoot && target.startsWith(repoRoot)
+      }
+      .getOrElse { false }
+
+  /**
    * Get a list of available [PGPIdentifier]s for the current password repository. This method
    * throws when no identifiers were able to be parsed. If this method returns null, it means that
    * an invalid identifier was encountered and further execution must stop to let the user correct

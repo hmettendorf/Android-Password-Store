@@ -65,11 +65,12 @@ class ApplicationPlugin : Plugin<Project> {
     }
   }
 
-  private fun Project.isSnapshot(): Boolean {
-    with(providers) {
-      val workflow = environmentVariable("GITHUB_WORKFLOW")
-      val snapshot = environmentVariable("SNAPSHOT")
-      return workflow.isPresent || snapshot.isPresent
-    }
-  }
+  /**
+   * Whether this is a snapshot build, which ships debug features in a release-type build.
+   *
+   * Deliberately keyed off an explicit opt-in only. This used to also trigger on GITHUB_WORKFLOW,
+   * which GitHub Actions sets for every job -- so any release build produced by any workflow
+   * silently enabled debug logging.
+   */
+  private fun Project.isSnapshot(): Boolean = providers.environmentVariable("SNAPSHOT").isPresent
 }

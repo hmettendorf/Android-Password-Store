@@ -12,6 +12,7 @@ import app.passwordstore.util.coroutines.DispatcherProvider
 import app.passwordstore.util.extensions.getString
 import app.passwordstore.util.storage.EncryptedPreferences
 import app.passwordstore.util.storage.EncryptedStoreMigration
+import app.passwordstore.util.storage.KeyAuthenticationRequiredException
 import app.passwordstore.util.storage.KeyUnusableException
 import app.passwordstore.util.storage.KeystoreCipher
 import javax.inject.Inject
@@ -36,36 +37,42 @@ class PGPPassphraseCache @Inject constructor(private val dispatcherProvider: Dis
 
   suspend fun cachePassphrase(context: Context, identifier: PGPIdentifier, passphrase: String) {
     withContext(dispatcherProvider.io()) {
-      recoveringFromInvalidKey(context) { it.edit { putString(identifier.toString(), passphrase) } }
+      usingCache(context, whenLocked = {}) {
+        it.edit { putString(identifier.toString(), passphrase) }
+      }
     }
   }
 
   suspend fun retrieveCachedPassphrase(context: Context, identifier: PGPIdentifier): String? {
     return withContext(dispatcherProvider.io()) {
-      recoveringFromInvalidKey(context) { it.getString(identifier.toString()) }
+      usingCache(context, whenLocked = { null }) { it.getString(identifier.toString()) }
     }
   }
 
   suspend fun clearCachedPassphrase(context: Context, identifier: PGPIdentifier) {
     withContext(dispatcherProvider.io()) {
-      recoveringFromInvalidKey(context) { it.edit { remove(identifier.toString()) } }
+      usingCache(context, whenLocked = {}) { it.edit { remove(identifier.toString()) } }
     }
   }
 
   suspend fun clearAllCachedPassphrases(context: Context) {
     withContext(dispatcherProvider.io()) {
-      recoveringFromInvalidKey(context) { it.edit { clear() } }
+      usingCache(context, whenLocked = {}) { it.edit { clear() } }
     }
   }
 
   /**
-   * Runs [block] against the cache; on [KeyUnusableException] drops the cache and retries once.
+   * Runs [block] against the cache, absorbing the two ways a Keystore-backed store can refuse.
    *
-   * The key is invalidated whenever the user changes their device credential or re-enrolls
-   * biometrics. For a cache that is a routine event, not an error.
+   * On [KeyUnusableException] -- the user changed their device credential or re-enrolled biometrics
+   * -- the cache is dropped and rebuilt. On [KeyAuthenticationRequiredException] the authentication
+   * window has simply closed, so [whenLocked] decides what an unavailable cache looks like. Both
+   * cost at most one extra passphrase prompt, which is a great deal cheaper than letting the
+   * exception escape into the activity that called us.
    */
-  private fun <T> recoveringFromInvalidKey(
+  private fun <T> usingCache(
     context: Context,
+    whenLocked: () -> T,
     block: (EncryptedPreferences) -> T,
   ): T =
     try {
@@ -73,7 +80,14 @@ class PGPPassphraseCache @Inject constructor(private val dispatcherProvider: Dis
     } catch (e: KeyUnusableException) {
       logcat(INFO) { "Passphrase cache key was invalidated, starting a fresh cache" }
       resetStore(context)
-      block(getStore(context))
+      try {
+        block(getStore(context))
+      } catch (e: KeyAuthenticationRequiredException) {
+        whenLocked()
+      }
+    } catch (e: KeyAuthenticationRequiredException) {
+      logcat(INFO) { "Passphrase cache is locked, treating it as unavailable" }
+      whenLocked()
     }
 
   private fun getStore(context: Context): EncryptedPreferences =
