@@ -9,10 +9,8 @@ plugins {
 }
 
 android {
-  buildFeatures {
-    compose = true
-    androidResources = true
-  }
+  buildFeatures { compose = true }
+  androidResources.enable = true
   namespace = "app.passwordstore.ui.compose"
 }
 
@@ -20,6 +18,7 @@ dependencies {
   api(platform(libs.compose.bom))
   api(libs.compose.foundation.core)
   api(libs.compose.foundation.layout)
+  api(libs.compose.material.icons.core)
   api(libs.compose.material3)
   api(libs.compose.ui.core)
   implementation(libs.androidx.core.ktx)

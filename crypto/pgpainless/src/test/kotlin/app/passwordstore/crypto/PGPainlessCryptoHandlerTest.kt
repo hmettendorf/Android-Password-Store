@@ -11,6 +11,7 @@ import app.passwordstore.crypto.CryptoConstants.PLAIN_TEXT
 import app.passwordstore.crypto.errors.IncorrectPassphraseException
 import app.passwordstore.crypto.errors.NonStandardAEAD
 import com.github.michaelbull.result.getError
+import com.github.michaelbull.result.unwrapError
 import com.google.testing.junit.testparameterinjector.TestParameter
 import com.google.testing.junit.testparameterinjector.TestParameterInjector
 import java.io.ByteArrayOutputStream
@@ -152,7 +153,8 @@ class PGPainlessCryptoHandlerTest {
         PGPDecryptOptions.Builder().build(),
       )
     assertTrue(res.isErr)
-    assertIs<NonStandardAEAD>(res.error, message = "${res.error.cause}")
+    val error = res.unwrapError()
+    assertIs<NonStandardAEAD>(error, message = "${error.cause}")
   }
 
   @Test

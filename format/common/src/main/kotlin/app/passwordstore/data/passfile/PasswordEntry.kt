@@ -12,6 +12,7 @@ import app.passwordstore.util.totp.TotpFinder
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
+import com.github.michaelbull.result.getOrThrow
 import com.github.michaelbull.result.mapBoth
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -62,13 +63,8 @@ constructor(
   public val totp: Flow<Totp> = flow {
     require(totpSecret != null) { "Cannot collect this flow without a TOTP secret" }
     do {
-      val otp = calculateTotp()
-      if (otp.isOk) {
-        emit(otp.value)
-        delay(THOUSAND_MILLIS.milliseconds)
-      } else {
-        throw otp.error
-      }
+      emit(calculateTotp().getOrThrow())
+      delay(THOUSAND_MILLIS.milliseconds)
     } while (coroutineContext.isActive)
   }
 
@@ -77,7 +73,7 @@ constructor(
     get() {
       val otp = calculateTotp()
       check(otp.isOk)
-      return otp.value.value
+      return otp.getOrThrow().value
     }
 
   /** String representation of [extraContent] but with usernames stripped. */

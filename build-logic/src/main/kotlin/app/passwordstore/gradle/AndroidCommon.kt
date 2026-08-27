@@ -20,7 +20,7 @@ import org.gradle.kotlin.dsl.withType
 object AndroidCommon {
   fun configure(project: Project) {
     project.extensions.configure<TestedExtension> {
-      compileSdkVersion(35)
+      compileSdkVersion(36)
       defaultConfig {
         minSdk = 26
         targetSdk = 34
@@ -33,6 +33,9 @@ object AndroidCommon {
         resources.excludes.add("**/plugin.properties")
         resources.excludes.add("**/META-INF/AL2.0")
         resources.excludes.add("**/META-INF/LGPL2.1")
+        // BouncyCastle 1.85 ships these in both bcprov and bcutil
+        resources.excludes.add("**/META-INF/LICENSE.md")
+        resources.excludes.add("**/META-INF/NOTICE.md")
       }
 
       testOptions {

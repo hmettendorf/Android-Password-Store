@@ -31,8 +31,10 @@ import app.passwordstore.util.features.Feature.EnablePGPPassphraseCache
 import app.passwordstore.util.features.Features
 import app.passwordstore.util.settings.Constants
 import app.passwordstore.util.settings.PreferenceKeys
+import com.github.michaelbull.result.getOrThrow
 import com.github.michaelbull.result.onFailure
 import com.github.michaelbull.result.runCatching
+import com.github.michaelbull.result.unwrapError
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -248,18 +250,19 @@ class DecryptActivity : BasePGPActivity() {
     val outputStream = ByteArrayOutputStream()
     val result = repository.decrypt(passphrase, identifiers, message, outputStream)
     if (result.isOk) {
-      val entry = passwordEntryFactory.create(result.value.toByteArray())
+      val entry = passwordEntryFactory.create(result.getOrThrow().toByteArray())
       passwordEntry = entry
       createPasswordUI(entry)
       startAutoDismissTimer()
       onSuccess()
     } else {
-      logcat(ERROR) { result.error.stackTraceToString() }
-      when (result.error) {
+      val error = result.unwrapError()
+      logcat(ERROR) { error.stackTraceToString() }
+      when (error) {
         is NonStandardAEAD -> {
           BasicBottomSheet.Builder(this)
             .setTitle(getString(R.string.aead_detect_title))
-            .setMessage(getString(R.string.aead_detect_message, result.error.message))
+            .setMessage(getString(R.string.aead_detect_message, error.message))
             .setPositiveButtonClickListener(getString(R.string.dialog_ok)) {
               setResult(RESULT_CANCELED)
               finish()
