@@ -46,6 +46,9 @@ jobs:
       - name: Run unit tests
         run: ./gradlew test -PslimTests
 
+      - name: Check library API
+        run: ./gradlew metalavaCheckCompatibilityRelease
+
       - name: Build debug APKs
         run: ./gradlew assembleFreeDebug assembleNonFreeDebug
 
