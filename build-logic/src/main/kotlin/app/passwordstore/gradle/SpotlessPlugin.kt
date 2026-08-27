@@ -21,18 +21,18 @@ class SpotlessPlugin : Plugin<Project> {
       kotlin {
         ktfmt(KTFMT_VERSION).googleStyle()
         target("**/*.kt")
-        targetExclude("**/build/")
+        targetExclude("**/build/**")
       }
       kotlinGradle {
         ktfmt(KTFMT_VERSION).googleStyle()
         target("**/*.kts")
-        targetExclude("**/build/")
+        targetExclude("**/build/**")
       }
       format("xml") {
         target("**/*.xml")
-        targetExclude("**/build/", ".idea/")
+        targetExclude("**/build/**", ".idea/**")
         trimTrailingWhitespace()
-        indentWithSpaces()
+        leadingTabsToSpaces()
         endWithNewline()
       }
     }
