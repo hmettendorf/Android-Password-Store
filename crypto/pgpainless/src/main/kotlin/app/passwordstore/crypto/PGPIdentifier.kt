@@ -52,16 +52,24 @@ public sealed class PGPIdentifier {
     private const val HEX_32_STRING_LENGTH = 8
     private const val TRUNCATED_FINGERPRINT_LENGTH = 16
 
+    /** GnuPG's "use exactly this key" suffix. */
+    private const val EXACT_KEY_MARKER = "!"
+
     /**
      * Attempts to parse an untyped String identifier into a concrete subtype of [PGPIdentifier].
      */
     @Suppress("ReturnCount")
     public fun fromString(identifier: String): PGPIdentifier? {
       if (identifier.isEmpty()) return null
+      // GnuPG recipient syntax permits a trailing '!' to pin an exact key rather than let gpg
+      // pick a better one, and `pass` writes .gpg-id entries through verbatim. The distinction
+      // does not survive into this app -- keys are looked up by ID and pgpainless selects the
+      // encryption subkey -- so the marker is accepted and dropped.
+      val hexCandidate = identifier.removePrefix("0x").removeSuffix(EXACT_KEY_MARKER)
+
       // Match long key IDs:
       // FF22334455667788 or 0xFF22334455667788
-      val maybeLongKeyId =
-        identifier.removePrefix("0x").takeIf { it.matches("[a-fA-F\\d]{16}".toRegex()) }
+      val maybeLongKeyId = hexCandidate.takeIf { it.matches("[a-fA-F\\d]{16}".toRegex()) }
       if (maybeLongKeyId != null) {
         val keyId = maybeLongKeyId.toULong(HEX_RADIX)
         return KeyId(keyId.toLong())
@@ -69,8 +77,7 @@ public sealed class PGPIdentifier {
 
       // Match fingerprints:
       // FF223344556677889900112233445566778899 or 0xFF223344556677889900112233445566778899
-      val maybeFingerprint =
-        identifier.removePrefix("0x").takeIf { it.matches("[a-fA-F\\d]{40}".toRegex()) }
+      val maybeFingerprint = hexCandidate.takeIf { it.matches("[a-fA-F\\d]{40}".toRegex()) }
       if (maybeFingerprint != null) {
         // Truncating to the long key ID is not a security issue since OpenKeychain only
         // accepts
