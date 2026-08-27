@@ -68,14 +68,14 @@ class FieldItemAdapter(
               endIconDrawable =
                 ContextCompat.getDrawable(itemView.context, R.drawable.ic_content_copy)
               endIconMode = TextInputLayout.END_ICON_CUSTOM
-              setEndIconOnClickListener { copyTextToClipboard(itemText.text.toString()) }
+              setEndIconOnClickListener { copyTextToClipboard(itemText.text?.toString().orEmpty()) }
             }
             itemText.transformationMethod = null
           }
           FieldItem.ActionType.HIDE -> {
             itemTextContainer.apply {
               endIconMode = TextInputLayout.END_ICON_PASSWORD_TOGGLE
-              setOnClickListener { copyTextToClipboard(itemText.text.toString()) }
+              setOnClickListener { copyTextToClipboard(itemText.text?.toString().orEmpty()) }
             }
             itemText.apply {
               transformationMethod =
@@ -91,7 +91,7 @@ class FieldItemAdapter(
                     composeR.font.jetbrainsmono_nl_regular,
                   )
               }
-              setOnClickListener { copyTextToClipboard(itemText.text.toString()) }
+              setOnClickListener { copyTextToClipboard(itemText.text?.toString().orEmpty()) }
             }
           }
         }

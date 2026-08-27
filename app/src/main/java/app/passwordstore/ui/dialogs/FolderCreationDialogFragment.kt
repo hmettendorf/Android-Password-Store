@@ -8,7 +8,6 @@ import android.app.Dialog
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.appcompat.app.AlertDialog
-import androidx.core.os.bundleOf
 import androidx.fragment.app.DialogFragment
 import app.passwordstore.R
 import app.passwordstore.ui.passwords.PasswordStore
@@ -68,7 +67,7 @@ class FolderCreationDialogFragment : DialogFragment() {
     private const val CURRENT_DIR_EXTRA = "CURRENT_DIRECTORY"
 
     fun newInstance(startingDirectory: String): FolderCreationDialogFragment {
-      val extras = bundleOf(CURRENT_DIR_EXTRA to startingDirectory)
+      val extras = Bundle().apply { putString(CURRENT_DIR_EXTRA, startingDirectory) }
       val fragment = FolderCreationDialogFragment()
       fragment.arguments = extras
       return fragment

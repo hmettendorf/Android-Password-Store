@@ -234,6 +234,9 @@ object SshKey {
     type = if (isGenerated) Type.LegacyGenerated else Type.Imported
   }
 
+  // androidx.security:security-crypto is deprecated in 1.1.0 with no AndroidX replacement.
+  // Suppressed to keep storage behaviour unchanged; replacing it is tracked separately.
+  @Suppress("DEPRECATION")
   private suspend fun getOrCreateWrappingMasterKey(requireAuthentication: Boolean) =
     withContext(Dispatchers.IO) {
       MasterKey.Builder(context, KEYSTORE_ALIAS)
@@ -243,6 +246,9 @@ object SshKey {
         .build()
     }
 
+  // androidx.security:security-crypto is deprecated in 1.1.0 with no AndroidX replacement.
+  // Suppressed to keep storage behaviour unchanged; replacing it is tracked separately.
+  @Suppress("DEPRECATION")
   private suspend fun getOrCreateWrappedPrivateKeyFile(requireAuthentication: Boolean) =
     withContext(Dispatchers.IO) {
       EncryptedFile.Builder(

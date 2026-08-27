@@ -10,7 +10,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.widget.FrameLayout
-import androidx.core.os.bundleOf
 import androidx.fragment.app.setFragmentResult
 import app.passwordstore.R
 import app.passwordstore.ui.passwords.PasswordFragment.Companion.ACTION_FOLDER
@@ -58,11 +57,17 @@ class ItemCreationBottomSheet : BottomSheetDialogFragment() {
             addBottomSheetCallback(bottomSheetCallback)
           }
           dialog.findViewById<View>(R.id.create_folder)?.setOnClickListener {
-            setFragmentResult(ITEM_CREATION_REQUEST_KEY, bundleOf(ACTION_KEY to ACTION_FOLDER))
+            setFragmentResult(
+              ITEM_CREATION_REQUEST_KEY,
+              Bundle().apply { putString(ACTION_KEY, ACTION_FOLDER) },
+            )
             dismiss()
           }
           dialog.findViewById<View>(R.id.create_password)?.setOnClickListener {
-            setFragmentResult(ITEM_CREATION_REQUEST_KEY, bundleOf(ACTION_KEY to ACTION_PASSWORD))
+            setFragmentResult(
+              ITEM_CREATION_REQUEST_KEY,
+              Bundle().apply { putString(ACTION_KEY, ACTION_PASSWORD) },
+            )
             dismiss()
           }
         }

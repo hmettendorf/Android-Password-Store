@@ -65,6 +65,10 @@ private fun ToggleButton(
   }
 }
 
+// LocalClipboardManager is deprecated in favour of the suspend-based LocalClipboard. Migrating
+// means building the ClipEntry by hand, which is also where this path should start setting
+// IS_SENSITIVE the way BasePGPActivity.copyTextToClipboard does. Left as a separate change.
+@Suppress("DEPRECATION")
 @Composable
 public fun CopyButton(
   textToCopy: String,

@@ -34,8 +34,8 @@ import app.passwordstore.util.settings.PreferenceKeys
 import com.github.androidpasswordstore.autofillparser.AutofillAction
 import com.github.androidpasswordstore.autofillparser.Credentials
 import com.github.michaelbull.result.getOrElse
-import com.github.michaelbull.result.onFailure
-import com.github.michaelbull.result.onSuccess
+import com.github.michaelbull.result.onErr
+import com.github.michaelbull.result.onOk
 import com.github.michaelbull.result.runCatching
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.ByteArrayOutputStream
@@ -203,19 +203,19 @@ class AutofillDecryptActivity : BasePGPActivity() {
     identifiers: List<PGPIdentifier>,
   ): Credentials? {
     runCatching { file.readBytes().inputStream() }
-      .onFailure { e ->
+      .onErr { e ->
         logcat(ERROR) { e.asLog("File to decrypt not found") }
         return null
       }
-      .onSuccess { encryptedInput ->
+      .onOk { encryptedInput ->
         val outputStream = ByteArrayOutputStream()
         repository
           .decrypt(password, identifiers, encryptedInput, outputStream)
-          .onFailure { e ->
+          .onErr { e ->
             logcat(ERROR) { e.asLog("Decryption failed") }
             return null
           }
-          .onSuccess { result ->
+          .onOk { result ->
             return runCatching {
                 runCatching {
                     if (features.isEnabled(EnablePGPPassphraseCache)) {
@@ -225,7 +225,7 @@ class AutofillDecryptActivity : BasePGPActivity() {
                       }
                     }
                   }
-                  .onFailure { e -> logcat { e.asLog() } }
+                  .onErr { e -> logcat { e.asLog() } }
                 val entry = passwordEntryFactory.create(result.toByteArray())
                 AutofillPreferences.credentialsFromStoreEntry(this, file, entry, directoryStructure)
               }

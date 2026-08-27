@@ -48,6 +48,14 @@ class Application : android.app.Application(), SharedPreferences.OnSharedPrefere
   @Inject lateinit var proxyUtils: ProxyUtils
   @Inject lateinit var features: Features
 
+  // logcat 0.4 deprecates install(LogcatLogger). The replacement no-arg install() exposes no
+  // documented way to set a minimum priority, and guessing wrong would silently disable the
+  // ENABLE_DEBUG_LOGGING pref on release builds. Kept on the deprecated overload deliberately.
+  @Suppress("DEPRECATION")
+  private fun installLogcatLogger() {
+    LogcatLogger.install(AndroidLogcatLogger(DEBUG))
+  }
+
   override fun onCreate() {
     super.onCreate()
     instance = this
@@ -55,7 +63,7 @@ class Application : android.app.Application(), SharedPreferences.OnSharedPrefere
       BuildConfig.ENABLE_DEBUG_FEATURES ||
         prefs.getBoolean(PreferenceKeys.ENABLE_DEBUG_LOGGING, false)
     ) {
-      LogcatLogger.install(AndroidLogcatLogger(DEBUG))
+      installLogcatLogger()
       setVmPolicy()
     }
     prefs.registerOnSharedPreferenceChangeListener(this)

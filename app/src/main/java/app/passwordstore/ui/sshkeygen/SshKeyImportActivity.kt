@@ -12,7 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import app.passwordstore.R
 import app.passwordstore.util.git.sshj.SshKey
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.runCatching
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
@@ -35,7 +35,7 @@ class SshKeyImportActivity : AppCompatActivity() {
           setResult(RESULT_OK)
           finish()
         }
-        .onFailure { e ->
+        .onErr { e ->
           MaterialAlertDialogBuilder(this)
             .setTitle(resources.getString(R.string.ssh_key_error_dialog_title))
             .setMessage(e.message)

@@ -14,7 +14,7 @@ import app.passwordstore.crypto.PGPainlessCryptoHandler
 import app.passwordstore.injection.prefs.SettingsPreferences
 import app.passwordstore.util.coroutines.DispatcherProvider
 import app.passwordstore.util.settings.PreferenceKeys
-import com.github.michaelbull.result.filterValues
+import com.github.michaelbull.result.filterOk
 import com.github.michaelbull.result.map
 import com.github.michaelbull.result.mapBoth
 import java.io.ByteArrayInputStream
@@ -38,7 +38,7 @@ constructor(
   }
 
   suspend fun isPasswordProtected(identifiers: List<PGPIdentifier>): Boolean {
-    val keys = identifiers.map { pgpKeyManager.getKeyById(it) }.filterValues()
+    val keys = identifiers.map { pgpKeyManager.getKeyById(it) }.filterOk()
     return pgpCryptoHandler.isPassphraseProtected(keys)
   }
 
@@ -49,7 +49,7 @@ constructor(
     out: ByteArrayOutputStream,
   ) =
     withContext(dispatcherProvider.io()) {
-      val keys = identities.map { id -> pgpKeyManager.getKeyById(id) }.filterValues()
+      val keys = identities.map { id -> pgpKeyManager.getKeyById(id) }.filterOk()
       val decryptionOptions = PGPDecryptOptions.Builder().build()
       pgpCryptoHandler.decrypt(keys, password, message, out, decryptionOptions).map { out }
     }
@@ -64,7 +64,7 @@ constructor(
         PGPEncryptOptions.Builder()
           .withAsciiArmor(settings.getBoolean(PreferenceKeys.ASCII_ARMOR, false))
           .build()
-      val keys = identities.map { id -> pgpKeyManager.getKeyById(id) }.filterValues()
+      val keys = identities.map { id -> pgpKeyManager.getKeyById(id) }.filterOk()
       pgpCryptoHandler.encrypt(keys, content, out, encryptionOptions).map { out }
     }
 }

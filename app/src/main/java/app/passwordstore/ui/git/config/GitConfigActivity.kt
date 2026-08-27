@@ -23,7 +23,7 @@ import app.passwordstore.util.extensions.launchActivity
 import app.passwordstore.util.extensions.viewBinding
 import com.github.michaelbull.result.fold
 import com.github.michaelbull.result.getOrElse
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.runCatching
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
@@ -48,8 +48,8 @@ class GitConfigActivity : BaseGitActivity() {
     binding.gitUserEmail.setText(gitSettings.authorEmail)
     setupTools()
     binding.saveButton.setOnClickListener {
-      val email = binding.gitUserEmail.text.toString().trim()
-      val name = binding.gitUserName.text.toString().trim()
+      val email = binding.gitUserEmail.text?.toString().orEmpty().trim()
+      val name = binding.gitUserName.text?.toString().orEmpty().trim()
       if (!email.matches(Patterns.EMAIL_ADDRESS.toRegex())) {
         MaterialAlertDialogBuilder(this)
           .setMessage(getString(R.string.invalid_email_dialog_text))
@@ -92,7 +92,7 @@ class GitConfigActivity : BaseGitActivity() {
     }
     binding.gitLog.setOnClickListener {
       runCatching { launchActivity(GitLogActivity::class.java) }
-        .onFailure { ex -> logcat(ERROR) { ex.asLog("Failed to start GitLogActivity") } }
+        .onErr { ex -> logcat(ERROR) { ex.asLog("Failed to start GitLogActivity") } }
     }
     binding.gitAbortRebase.setOnClickListener { abortRebase() }
     binding.gitResetToRemote.setOnClickListener { resetToRemote() }

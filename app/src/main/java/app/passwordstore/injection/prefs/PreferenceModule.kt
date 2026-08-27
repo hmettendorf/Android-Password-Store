@@ -22,6 +22,9 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 class PreferenceModule {
 
+  // androidx.security:security-crypto is deprecated in 1.1.0 with no AndroidX replacement.
+  // Suppressed to keep storage behaviour unchanged; replacing it is tracked separately.
+  @Suppress("DEPRECATION")
   private fun createEncryptedPreferences(context: Context, fileName: String): SharedPreferences {
     val masterKeyAlias =
       MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()

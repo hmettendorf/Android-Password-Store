@@ -22,7 +22,7 @@ import app.passwordstore.util.coroutines.DispatcherProvider
 import app.passwordstore.util.extensions.viewBinding
 import app.passwordstore.util.viewmodel.ListMode
 import app.passwordstore.util.viewmodel.SearchableRepositoryViewModel
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.runCatching
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
@@ -83,9 +83,7 @@ class SelectFolderFragment : Fragment(R.layout.password_recycler_view) {
             }
           }
       }
-      .onFailure {
-        throw ClassCastException("$context must implement OnFragmentInteractionListener")
-      }
+      .onErr { throw ClassCastException("$context must implement OnFragmentInteractionListener") }
   }
 
   val currentDir: File

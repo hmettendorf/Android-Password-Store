@@ -32,7 +32,7 @@ import app.passwordstore.util.features.Features
 import app.passwordstore.util.settings.Constants
 import app.passwordstore.util.settings.PreferenceKeys
 import com.github.michaelbull.result.getOrThrow
-import com.github.michaelbull.result.onFailure
+import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.runCatching
 import com.github.michaelbull.result.unwrapError
 import dagger.hilt.android.AndroidEntryPoint
@@ -233,7 +233,7 @@ class DecryptActivity : BasePGPActivity() {
                   settings.edit { putBoolean(PreferenceKeys.CLEAR_PASSPHRASE_CACHE, clearCache) }
                 }
               }
-              .onFailure { e -> logcat { e.asLog() } }
+              .onErr { e -> logcat { e.asLog() } }
           }
         }
       }
