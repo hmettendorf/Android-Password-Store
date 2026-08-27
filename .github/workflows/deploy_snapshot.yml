@@ -1,7 +1,7 @@
 on:
-  push:
-    branches:
-      - develop
+  # Disabled for this fork: needs secrets.ENCRYPT_KEY (upstream signing keystore) + SENTRY_*.
+  # Left as manual-only so the definition is preserved; re-add triggers if needed.
+  workflow_dispatch:
 
 permissions:
   contents: write

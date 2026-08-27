@@ -1,6 +1,7 @@
 on:
-  pull_request:
-  merge_group:
+  # Disabled for this fork: superseded by ci.yml, which does not depend on the archived upstream repo.
+  # Left as manual-only so the definition is preserved; re-add triggers if needed.
+  workflow_dispatch:
 
 name: Check pull request
 

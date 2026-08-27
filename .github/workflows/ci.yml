@@ -1,0 +1,66 @@
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+  workflow_dispatch:
+
+name: CI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  # Upstream injects a real DSN from secrets. A fork has none, and the build only
+  # requires the value to be well-formed, not valid.
+  SENTRY_DSN: 'https://public_key@example.com/project_id'
+
+jobs:
+  build:
+    name: Check and build
+    runs-on: ubuntu-latest
+    steps:
+      # The setup steps are inlined rather than pulled from
+      # android-password-store/android-password-store/.github/reusable-workflows/setup-gradle,
+      # so this fork's CI does not depend on the archived upstream repository.
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          add-job-summary: always
+          cache-cleanup: on-success
+          validate-wrappers: true
+
+      - name: Check codestyle
+        run: ./gradlew spotlessCheck
+
+      - name: Run unit tests
+        run: ./gradlew test -PslimTests
+
+      - name: Build debug APKs
+        run: ./gradlew assembleFreeDebug assembleNonFreeDebug
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v7
+        with:
+          name: apks
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+      - name: (Fail-only) Upload test report
+        if: "${{ failure() }}"
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-report
+          path: |
+            app/build/reports
+            crypto/pgpainless/build/reports

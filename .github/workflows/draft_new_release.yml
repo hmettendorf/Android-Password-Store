@@ -1,8 +1,9 @@
 name: Draft new release
 
 on:
-  milestone:
-    types: [closed]
+  # Disabled for this fork: drafts upstream releases from closed milestones.
+  # Left as manual-only so the definition is preserved; re-add triggers if needed.
+  workflow_dispatch:
 
 jobs:
   draft-new-release:
