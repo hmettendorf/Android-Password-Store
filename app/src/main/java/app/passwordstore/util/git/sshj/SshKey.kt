@@ -18,12 +18,14 @@ import androidx.security.crypto.EncryptedFile
 import androidx.security.crypto.MasterKey
 import app.passwordstore.Application
 import app.passwordstore.R
-import app.passwordstore.util.extensions.getEncryptedGitPrefs
+import app.passwordstore.injection.prefs.PreferenceEntryPoint
 import app.passwordstore.util.extensions.getString
 import app.passwordstore.util.extensions.sharedPrefs
 import app.passwordstore.util.extensions.unsafeLazy
 import app.passwordstore.util.settings.PreferenceKeys
+import app.passwordstore.util.storage.KeystoreCipher
 import com.github.michaelbull.result.getOrElse
+import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.runCatching
 import java.io.File
 import java.io.IOException
@@ -35,8 +37,9 @@ import java.security.PublicKey
 import javax.crypto.SecretKey
 import javax.crypto.SecretKeyFactory
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import logcat.LogPriority.ERROR
+import logcat.LogPriority.INFO
 import logcat.asLog
 import logcat.logcat
 import net.i2p.crypto.eddsa.EdDSAPrivateKey
@@ -50,6 +53,16 @@ import net.schmizz.sshj.userauth.keyprovider.KeyProvider
 private const val PROVIDER_ANDROID_KEY_STORE = "AndroidKeyStore"
 private const val KEYSTORE_ALIAS = "sshkey"
 private const val ANDROIDX_SECURITY_KEYSET_PREF_NAME = "androidx_sshkey_keyset_prefs"
+
+/**
+ * Wrapping key for [SshKey.Type.KeystoreWrappedEd25519]. Deliberately distinct from
+ * [KEYSTORE_ALIAS]: during migration the legacy MasterKey still lives under that alias, and
+ * generating the replacement there would destroy the only means of reading the old key.
+ */
+private const val KEYSTORE_WRAP_ALIAS = "sshkey_wrap"
+
+/** Matches the validity window the legacy wrapping MasterKey was created with. */
+private const val WRAP_KEY_AUTH_VALIDITY_SECONDS = 15
 
 private val androidKeystore: KeyStore by unsafeLazy {
   KeyStore.getInstance(PROVIDER_ANDROID_KEY_STORE).apply { load(null) }
@@ -88,7 +101,11 @@ object SshKey {
     get() {
       return runCatching {
           if (type !in listOf(Type.KeystoreNative, Type.KeystoreWrappedEd25519)) return false
-          when (val key = androidKeystore.getKey(KEYSTORE_ALIAS, null)) {
+          val alias =
+            if (type == Type.KeystoreWrappedEd25519 && !legacyWrappedKeyExists())
+              KEYSTORE_WRAP_ALIAS
+            else KEYSTORE_ALIAS
+          when (val key = androidKeystore.getKey(alias, null)) {
             is PrivateKey -> {
               val factory = KeyFactory.getInstance(key.algorithm, PROVIDER_ANDROID_KEY_STORE)
               return factory.getKeySpec(key, KeyInfo::class.java).isUserAuthenticationRequired
@@ -174,6 +191,8 @@ object SshKey {
 
   private fun delete() {
     androidKeystore.deleteEntry(KEYSTORE_ALIAS)
+    androidKeystore.deleteEntry(KEYSTORE_WRAP_ALIAS)
+    File(context.filesDir, ".ssh_key.migrating").delete()
     // Remove Tink key set used by AndroidX's EncryptedFile.
     context.getSharedPreferences(ANDROIDX_SECURITY_KEYSET_PREF_NAME, Context.MODE_PRIVATE).edit {
       clear()
@@ -184,7 +203,9 @@ object SshKey {
     if (publicKeyFile.isFile) {
       publicKeyFile.delete()
     }
-    context.getEncryptedGitPrefs().edit { remove(PreferenceKeys.SSH_KEY_LOCAL_PASSPHRASE) }
+    PreferenceEntryPoint.gitPreferences(context).edit {
+      remove(PreferenceKeys.SSH_KEY_LOCAL_PASSPHRASE)
+    }
     type = null
   }
 
@@ -234,43 +255,113 @@ object SshKey {
     type = if (isGenerated) Type.LegacyGenerated else Type.Imported
   }
 
-  // androidx.security:security-crypto is deprecated in 1.1.0 with no AndroidX replacement.
-  // Suppressed to keep storage behaviour unchanged; replacing it is tracked separately.
-  @Suppress("DEPRECATION")
-  private suspend fun getOrCreateWrappingMasterKey(requireAuthentication: Boolean) =
-    withContext(Dispatchers.IO) {
-      MasterKey.Builder(context, KEYSTORE_ALIAS)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .setRequestStrongBoxBacked(true)
-        .setUserAuthenticationRequired(requireAuthentication, 15)
-        .build()
-    }
+  private fun wrappingCipher(requireAuthentication: Boolean) =
+    KeystoreCipher(
+      context = context,
+      alias = KEYSTORE_WRAP_ALIAS,
+      requireUserAuthentication = requireAuthentication,
+      authValidityDurationSeconds = WRAP_KEY_AUTH_VALIDITY_SECONDS,
+      preferStrongBox = true,
+    )
 
-  // androidx.security:security-crypto is deprecated in 1.1.0 with no AndroidX replacement.
-  // Suppressed to keep storage behaviour unchanged; replacing it is tracked separately.
+  /** Encrypts [seed] to [target] with the Keystore wrapping key. */
+  private fun writeWrappedPrivateKey(
+    seed: ByteArray,
+    requireAuthentication: Boolean,
+    target: File,
+  ) {
+    target.writeBytes(wrappingCipher(requireAuthentication).encrypt(seed))
+  }
+
+  /** Reverses [writeWrappedPrivateKey]. */
+  private fun readWrappedPrivateKey(source: File = privateKeyFile): ByteArray =
+    wrappingCipher(requireAuthentication = false).decrypt(source.readBytes())
+
+  /** True while the private key is still stored in the legacy `EncryptedFile` format. */
+  private fun legacyWrappedKeyExists() =
+    context
+      .getSharedPreferences(ANDROIDX_SECURITY_KEYSET_PREF_NAME, Context.MODE_PRIVATE)
+      .all
+      .isNotEmpty()
+
+  // androidx.security:security-crypto is deprecated; this is the read side of the migration away
+  // from it and is deleted once the deprecation window closes.
   @Suppress("DEPRECATION")
-  private suspend fun getOrCreateWrappedPrivateKeyFile(requireAuthentication: Boolean) =
-    withContext(Dispatchers.IO) {
-      EncryptedFile.Builder(
-          context,
-          privateKeyFile,
-          getOrCreateWrappingMasterKey(requireAuthentication),
-          EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB,
-        )
-        .setKeysetPrefName(ANDROIDX_SECURITY_KEYSET_PREF_NAME)
-        .build()
-    }
+  private fun legacyEncryptedFile(): EncryptedFile =
+    EncryptedFile.Builder(
+        context,
+        privateKeyFile,
+        MasterKey.Builder(context, KEYSTORE_ALIAS)
+          .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+          .setRequestStrongBoxBacked(true)
+          .setUserAuthenticationRequired(false, 15)
+          .build(),
+        EncryptedFile.FileEncryptionScheme.AES256_GCM_HKDF_4KB,
+      )
+      .setKeysetPrefName(ANDROIDX_SECURITY_KEYSET_PREF_NAME)
+      .build()
+
+  /** Whether the legacy wrapping MasterKey was created with user authentication required. */
+  private fun legacyWrapKeyRequiresAuth(): Boolean =
+    runCatching {
+        val key =
+          androidKeystore.getKey(KEYSTORE_ALIAS, null) as? SecretKey ?: return@runCatching false
+        val factory = SecretKeyFactory.getInstance(key.algorithm, PROVIDER_ANDROID_KEY_STORE)
+        (factory.getKeySpec(key, KeyInfo::class.java) as KeyInfo).isUserAuthenticationRequired
+      }
+      .getOrElse { false }
+
+  /**
+   * Re-wraps a keystore-wrapped ed25519 key from the deprecated `EncryptedFile` onto the Keystore
+   * cipher.
+   *
+   * The replacement is written to a temporary file and read back before it replaces the original,
+   * so a failure at any point leaves the legacy key intact and the next attempt can retry. Losing
+   * this key is unrecoverable: the user would have to generate a new one and re-register it with
+   * their git host.
+   */
+  private fun migrateWrappedEd25519Key() {
+    if (type != Type.KeystoreWrappedEd25519 || !legacyWrappedKeyExists()) return
+
+    val staging = File(context.filesDir, ".ssh_key.migrating")
+    runCatching {
+        val seed = legacyEncryptedFile().openFileInput().use { it.readBytes() }
+        // Refuse to proceed unless the bytes really are a usable ed25519 key.
+        EdDSAPrivateKey(EdDSAPrivateKeySpec(seed, EdDSANamedCurveTable.ED_25519_CURVE_SPEC))
+
+        val requiresAuth = legacyWrapKeyRequiresAuth()
+        androidKeystore.deleteEntry(KEYSTORE_WRAP_ALIAS)
+        writeWrappedPrivateKey(seed, requiresAuth, staging)
+        check(readWrappedPrivateKey(staging).contentEquals(seed)) {
+          "Re-wrapped ed25519 key did not read back identically"
+        }
+
+        // Point of no return: everything above is verified, so the swap is safe.
+        check(staging.renameTo(privateKeyFile)) { "Could not replace the private key file" }
+        context
+          .getSharedPreferences(ANDROIDX_SECURITY_KEYSET_PREF_NAME, Context.MODE_PRIVATE)
+          .edit { clear() }
+        androidKeystore.deleteEntry(KEYSTORE_ALIAS)
+        logcat(INFO) { "Re-wrapped ed25519 SSH key onto the Keystore cipher" }
+      }
+      .onErr { error ->
+        staging.delete()
+        androidKeystore.deleteEntry(KEYSTORE_WRAP_ALIAS)
+        logcat(ERROR) { "Could not re-wrap ed25519 key, keeping the legacy key: ${error.asLog()}" }
+      }
+  }
 
   suspend fun generateKeystoreWrappedEd25519Key(requireAuthentication: Boolean) =
     withContext(Dispatchers.IO) {
       delete()
 
-      val encryptedPrivateKeyFile = getOrCreateWrappedPrivateKeyFile(requireAuthentication)
       // Generate the ed25519 key pair and encrypt the private key.
       val keyPair = net.i2p.crypto.eddsa.KeyPairGenerator().generateKeyPair()
-      encryptedPrivateKeyFile.openFileOutput().use { os ->
-        os.write((keyPair.private as EdDSAPrivateKey).seed)
-      }
+      writeWrappedPrivateKey(
+        (keyPair.private as EdDSAPrivateKey).seed,
+        requireAuthentication,
+        privateKeyFile,
+      )
 
       // Write public key in SSH format to .ssh_key.pub.
       publicKeyFile.writeText(toSshPublicKey(keyPair.public))
@@ -352,14 +443,10 @@ object SshKey {
 
     override fun getPrivate(): PrivateKey =
       runCatching {
-          // The current MasterKey API does not allow getting a reference to an existing
-          // one
-          // without specifying the KeySpec for a new one. However, the value for passed
-          // here
-          // for `requireAuthentication` is not used as the key already exists at this
-          // point.
-          val encryptedPrivateKeyFile = runBlocking { getOrCreateWrappedPrivateKeyFile(false) }
-          val rawPrivateKey = encryptedPrivateKeyFile.openFileInput().use { it.readBytes() }
+          // Keys written before the move off androidx.security still need re-wrapping. This is
+          // a no-op once done, and leaves the legacy key untouched if it cannot complete.
+          migrateWrappedEd25519Key()
+          val rawPrivateKey = readWrappedPrivateKey()
           EdDSAPrivateKey(
             EdDSAPrivateKeySpec(rawPrivateKey, EdDSANamedCurveTable.ED_25519_CURVE_SPEC)
           )

@@ -8,52 +8,73 @@ package app.passwordstore.injection.prefs
 import android.content.Context
 import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
 import app.passwordstore.BuildConfig
+import app.passwordstore.util.storage.EncryptedPreferences
+import app.passwordstore.util.storage.EncryptedStoreMigration
+import app.passwordstore.util.storage.KeystoreCipher
 import dagger.Module
 import dagger.Provides
-import dagger.Reusable
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 class PreferenceModule {
 
-  // androidx.security:security-crypto is deprecated in 1.1.0 with no AndroidX replacement.
-  // Suppressed to keep storage behaviour unchanged; replacing it is tracked separately.
-  @Suppress("DEPRECATION")
-  private fun createEncryptedPreferences(context: Context, fileName: String): SharedPreferences {
-    val masterKeyAlias =
-      MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
-    return EncryptedSharedPreferences.create(
-      context,
-      fileName,
-      masterKeyAlias,
-      EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-      EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
-    )
+  /**
+   * Opens an [EncryptedPreferences] for [fileName], migrating the legacy
+   * `EncryptedSharedPreferences` store of the same name on first use.
+   *
+   * Singleton rather than Reusable: each instance owns an in-memory cache and a DataStore handle,
+   * and DataStore throws if two instances are created for the same file.
+   */
+  private fun encryptedPreferences(context: Context, fileName: String): SharedPreferences {
+    val store =
+      EncryptedPreferences(
+        context = context,
+        storeName = fileName,
+        cipher = KeystoreCipher(context = context, alias = "aps_store_$fileName"),
+      )
+    EncryptedStoreMigration.migrate(context, fileName, store)
+    return store
   }
 
-  @[Provides PasswordGeneratorPreferences Reusable]
+  /**
+   * Password generator settings hold no secrets -- word count, separator, character classes -- so
+   * they live in ordinary preferences. Values are carried over from the encrypted store they used
+   * to occupy; losing them would only restore defaults.
+   */
+  @[Provides PasswordGeneratorPreferences Singleton]
   fun providePwgenPreferences(@ApplicationContext context: Context): SharedPreferences {
-    return createEncryptedPreferences(context, "pwgen_preferences")
+    val prefs = context.getSharedPreferences(PWGEN_PREFERENCES, MODE_PRIVATE)
+    EncryptedStoreMigration.migrateToPlain(context, LEGACY_PWGEN_PREFERENCES, prefs)
+    return prefs
   }
 
-  @[Provides SettingsPreferences Reusable]
+  @[Provides SettingsPreferences Singleton]
   fun provideSettingsPreferences(@ApplicationContext context: Context): SharedPreferences {
     return context.getSharedPreferences("${BuildConfig.APPLICATION_ID}_preferences", MODE_PRIVATE)
   }
 
-  @[Provides GitPreferences Reusable]
+  @[Provides GitPreferences Singleton]
   fun provideGitPreferences(@ApplicationContext context: Context): SharedPreferences {
-    return createEncryptedPreferences(context, "git_operation")
+    return encryptedPreferences(context, GIT_PREFERENCES)
   }
 
-  @[Provides ProxyPreferences Reusable]
+  @[Provides ProxyPreferences Singleton]
   fun provideProxyPreferences(@ApplicationContext context: Context): SharedPreferences {
-    return createEncryptedPreferences(context, "http_proxy")
+    return encryptedPreferences(context, PROXY_PREFERENCES)
+  }
+
+  companion object {
+
+    /** Distinct from the legacy name so the plain file cannot alias the encrypted one. */
+    const val PWGEN_PREFERENCES = "pwgen_settings"
+
+    private const val LEGACY_PWGEN_PREFERENCES = "pwgen_preferences"
+    const val GIT_PREFERENCES = "git_operation"
+    const val PROXY_PREFERENCES = "http_proxy"
   }
 }
