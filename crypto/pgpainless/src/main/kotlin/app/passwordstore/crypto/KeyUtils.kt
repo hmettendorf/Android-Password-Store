@@ -30,6 +30,18 @@ public object KeyUtils {
   }
 
   /**
+   * Every key ID in [key]'s ring: the primary key's, and each subkey's.
+   *
+   * `pass` and `gopass` write `.gpg-id` entries through from GnuPG verbatim, and GnuPG names
+   * whichever key the user pinned -- frequently an encryption subkey rather than the primary. A
+   * lookup that only compares [tryGetId] therefore fails to find keys that are in fact present.
+   */
+  public fun tryGetAllIds(key: PGPKey): List<KeyId> {
+    val keyRing = tryParseKeyring(key) ?: return emptyList()
+    return keyRing.publicKeys.asSequence().map { publicKey -> KeyId(publicKey.keyID) }.toList()
+  }
+
+  /**
    * Attempts to parse the given [PGPKey] into a [PGPKeyRing] and obtains the [UserId] of the
    * corresponding public key.
    */

@@ -11,4 +11,7 @@ object CryptoConstants {
   const val KEY_NAME = "John Doe"
   const val KEY_EMAIL = "john.doe@example.com"
   const val KEY_ID = 0x08edf7567183ce27
+
+  /** The encryption subkey of the same ring, which `.gpg-id` files may name directly. */
+  const val SUBKEY_ID = -0x304a91db5c65bdddL // 0xcfb56e24a39a4223
 }

@@ -117,6 +117,17 @@ class PGPKeyManagerTest {
     }
 
   @Test
+  fun getKeyBySubkeyId() =
+    runTest(dispatcher) {
+      keyManager.addKey(secretKey).unwrap()
+      // GnuPG lets a .gpg-id entry name a subkey -- often the encryption subkey -- rather than the
+      // primary, so a lookup that only compares the primary key ID reports a key that is present
+      // as missing.
+      val returnedKey = keyManager.getKeyById(KeyId(CryptoConstants.SUBKEY_ID)).unwrap()
+      assertEquals(keyManager.getKeyId(secretKey), keyManager.getKeyId(returnedKey))
+    }
+
+  @Test
   fun getKeyByFullUserId() =
     runTest(dispatcher) {
       keyManager.addKey(secretKey).unwrap()
