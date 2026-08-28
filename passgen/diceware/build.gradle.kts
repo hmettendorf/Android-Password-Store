@@ -5,6 +5,7 @@
 plugins {
   id("com.github.android-password-store.android-library")
   id("com.github.android-password-store.kotlin-android")
+  id("com.github.android-password-store.dokka")
 }
 
 android {

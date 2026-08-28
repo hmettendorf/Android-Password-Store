@@ -1,0 +1,63 @@
+on:
+  push:
+    branches:
+      - main
+  # Docs are built but not deployed for pull requests, so a change that breaks the
+  # Dokka build is caught on the PR rather than on the next push to main.
+  pull_request:
+  workflow_dispatch:
+
+name: Docs
+
+# Never cancel a run midway: cancelling between upload and deploy can leave the
+# Pages deployment pointing at a half-uploaded artifact.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build API docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          add-job-summary: always
+          cache-cleanup: on-success
+          validate-wrappers: true
+
+      - name: Generate documentation
+        run: ./gradlew dokkaGenerate
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: build/dokka/html
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # No PAT and no gh-pages branch: the artifact is deployed through an
+    # OIDC-authenticated token minted for this job alone.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
