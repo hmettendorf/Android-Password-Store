@@ -41,12 +41,13 @@ public object KeyUtils {
   /**
    * Tests if the given [key] can be used for encryption, which is a bare minimum necessity for the
    * app.
+   *
+   * A sign-only key -- an Ed25519 primary with no encryption subkey, say -- is not usable here: no
+   * password can ever be encrypted to it, so accepting one only defers the failure to decryption
+   * time where it is far harder to explain.
    */
   public fun isKeyUsable(key: PGPKey): Boolean {
-    return runCatching {
-        val keyRing = tryParseKeyring(key) ?: return false
-        PGPainless.inspectKeyRing(keyRing).isUsableForEncryption
-      }
-      .get() != null
+    val keyRing = tryParseKeyring(key) ?: return false
+    return runCatching { PGPainless.inspectKeyRing(keyRing).isUsableForEncryption }.get() == true
   }
 }

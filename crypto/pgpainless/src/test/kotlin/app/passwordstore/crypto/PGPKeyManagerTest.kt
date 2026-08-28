@@ -80,6 +80,17 @@ class PGPKeyManagerTest {
       assertEquals(UnusableKeyException, error)
     }
 
+  /**
+   * A sign-only key parses perfectly well and only fails at the moment a password needs encrypting,
+   * which is far too late to explain to anyone. It must be turned away at import.
+   */
+  @Test
+  fun addKeyWithSignOnlyKey() =
+    runTest(dispatcher) {
+      val error = keyManager.addKey(PGPKey(TestUtils.getSignOnlySecretKey())).unwrapError()
+      assertEquals(UnusableKeyException, error)
+    }
+
   @Test
   fun removeKey() =
     runTest(dispatcher) {

@@ -41,6 +41,28 @@ jobs:
           cache-cleanup: on-success
           validate-wrappers: true
 
+      # Without this every run signs with the throwaway debug keystore the runner generates,
+      # so no two CI builds -- and no CI build and local build -- can be installed over each
+      # other. The secret is optional: forks and PRs without it still build, they just produce
+      # APKs that cannot upgrade an existing install.
+      - name: Restore signing key
+        if: "${{ env.SIGNING_KEYSTORE != '' }}"
+        env:
+          SIGNING_KEYSTORE: "${{ secrets.SIGNING_KEYSTORE }}"
+          SIGNING_KEY_ALIAS: "${{ secrets.SIGNING_KEY_ALIAS }}"
+          SIGNING_KEY_PASSWORD: "${{ secrets.SIGNING_KEY_PASSWORD }}"
+          SIGNING_STORE_PASSWORD: "${{ secrets.SIGNING_STORE_PASSWORD }}"
+        run: |
+          set -euo pipefail
+          printf '%s' "$SIGNING_KEYSTORE" | base64 -d > "$RUNNER_TEMP/signing.jks"
+          umask 077
+          cat > keystore.properties <<PROPS
+          storeFile=$RUNNER_TEMP/signing.jks
+          storePassword=$SIGNING_STORE_PASSWORD
+          keyAlias=$SIGNING_KEY_ALIAS
+          keyPassword=$SIGNING_KEY_PASSWORD
+          PROPS
+
       - name: Check codestyle
         run: ./gradlew spotlessCheck
 
@@ -59,6 +81,10 @@ jobs:
           name: apks
           path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
+
+      - name: Remove signing key
+        if: "${{ always() }}"
+        run: rm -f keystore.properties "$RUNNER_TEMP/signing.jks"
 
       - name: (Fail-only) Upload test report
         if: "${{ failure() }}"

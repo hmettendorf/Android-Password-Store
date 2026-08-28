@@ -6,11 +6,13 @@ package app.passwordstore.util.git.sshj
 
 import android.util.Base64
 import androidx.appcompat.app.AppCompatActivity
+import app.passwordstore.R
 import app.passwordstore.util.coroutines.DispatcherProvider
 import app.passwordstore.util.git.operation.CredentialFinder
 import app.passwordstore.util.settings.AuthMode
 import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.runCatching
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -19,6 +21,7 @@ import java.security.PublicKey
 import java.util.Collections
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlinx.coroutines.runBlocking
 import logcat.LogPriority.WARN
@@ -93,7 +96,43 @@ class SshjSessionFactory(
   }
 }
 
-private fun makeTofuHostKeyVerifier(hostKeyFile: File): HostKeyVerifier {
+/**
+ * Asks the user to vouch for a host key the app has never seen before.
+ *
+ * Trust-on-first-use is only as good as that first use: whatever answers the very first connection
+ * is pinned for every one that follows, so an attacker in the middle at that moment becomes the
+ * server forever after. Showing the fingerprint is what turns that from a silent decision into one
+ * the user actually makes.
+ */
+private suspend fun confirmHostKey(
+  activity: AppCompatActivity,
+  hostname: String?,
+  port: Int,
+  fingerprint: String,
+): Boolean = suspendCoroutine { cont ->
+  var resumed = false
+  fun resumeOnce(trusted: Boolean) {
+    if (!resumed) {
+      resumed = true
+      cont.resume(trusted)
+    }
+  }
+  val host = if (port in 1..65535 && port != 22) "$hostname:$port" else "$hostname"
+  MaterialAlertDialogBuilder(activity)
+    .setTitle(R.string.host_key_verification_title)
+    .setMessage(activity.getString(R.string.host_key_verification_message, host, fingerprint))
+    .setPositiveButton(R.string.host_key_verification_trust) { _, _ -> resumeOnce(true) }
+    .setNegativeButton(R.string.dialog_cancel) { _, _ -> resumeOnce(false) }
+    .setOnCancelListener { resumeOnce(false) }
+    .setOnDismissListener { resumeOnce(false) }
+    .show()
+}
+
+private fun makeTofuHostKeyVerifier(
+  hostKeyFile: File,
+  authMethod: SshAuthMethod,
+  dispatcherProvider: DispatcherProvider,
+): HostKeyVerifier {
   if (!hostKeyFile.exists()) {
     return object : HostKeyVerifier {
       override fun verify(hostname: String?, port: Int, key: PublicKey?): Boolean {
@@ -103,6 +142,16 @@ private fun makeTofuHostKeyVerifier(hostKeyFile: File): HostKeyVerifier {
         digest.update(PlainBuffer().putPublicKey(key).compactData)
         val digestData = digest.digest()
         val hostKeyEntry = "SHA256:${Base64.encodeToString(digestData, Base64.NO_WRAP)}"
+        val trusted =
+          runBlocking(dispatcherProvider.main()) {
+            confirmHostKey(authMethod.activity, hostname, port, hostKeyEntry)
+          }
+        if (!trusted) {
+          logcat(SshjSessionFactory::class.java.simpleName, WARN) {
+            "User declined unknown host key: $hostKeyEntry"
+          }
+          return false
+        }
         logcat(SshjSessionFactory::class.java.simpleName) {
           "Trusting host key on first use: $hostKeyEntry"
         }
@@ -150,7 +199,7 @@ private class SshjSession(
 
   fun connect(): SshjSession {
     ssh = SSHClient(SshjConfig())
-    ssh.addHostKeyVerifier(makeTofuHostKeyVerifier(hostKeyFile))
+    ssh.addHostKeyVerifier(makeTofuHostKeyVerifier(hostKeyFile, authMethod, dispatcherProvider))
     ssh.connect(uri.host, uri.port.takeUnless { it == -1 } ?: 22)
     if (!ssh.isConnected) throw IOException()
     val passwordAuth =
