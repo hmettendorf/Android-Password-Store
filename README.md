@@ -1,7 +1,6 @@
 # Password Store
 
 [![CI](https://github.com/hmettendorf/Android-Password-Store/actions/workflows/ci.yml/badge.svg)](https://github.com/hmettendorf/Android-Password-Store/actions/workflows/ci.yml)
-![Backers on Open Collective](https://opencollective.com/Android-Password-Store/backers/badge.svg) ![Sponsors on Open Collective](https://opencollective.com/Android-Password-Store/sponsors/badge.svg)
 
 ## About this fork
 
@@ -43,10 +42,6 @@ Upstream development stopped in October 2024. This fork picks the project back u
 * **Dependency updates run themselves again.** Upstream's Renovate config was left behind without a bot to execute it. `renovate.yml` runs Renovate on a schedule from the repository itself, and validates the config on every PR that touches it. The config has been migrated to current Renovate, which removed `config:base`, `matchPackagePatterns` and `regexManagers`. Requires a `RENOVATE_TOKEN` secret.
 * **CI that runs on a fork.** Every workflow used to depend on a reusable workflow in the now-archived upstream repository. `ci.yml` inlines those steps and runs Spotless, the unit tests, the API compatibility check and both debug APK builds without needing any secrets. Workflows that require upstream secrets are kept but no longer trigger automatically.
 
-## Download
-
-See https://docs.passwordstore.app/docs/users/release-channels/
-
 ## Documentation
 
 ### API reference
@@ -67,24 +62,10 @@ The prose documentation is the original project's and has not been touched since
 
 ## Contributing
 
-Want to contribute? See if you can [find an issue](https://github.com/android-password-store/Android-Password-Store/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) you are interested in, then send a PR. Consult the [contribution](CONTRIBUTING.md) docs 
+Want to contribute? See if you can [find an issue](https://github.com/android-password-store/Android-Password-Store/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc) you are interested in, then send a PR. Consult the [contribution](CONTRIBUTING.md) docs
 
 Interested in helping to translate Password Store? Contribute [here](https://crowdin.com/project/android-password-store)!
 
 Wanna test development builds to find bugs and offer feedback? Read the [release channels](https://docs.passwordstore.app/docs/Users/release-channels) documentation to get access!
-
-## Community
-
-Ways to get in touch:
-
-* [Github issues](https://github.com/android-password-store/Android-Password-Store/issues): Use it if you have a bug report, or you want to submit a feature request.
-* [GitHub Discussions](https://github.com/android-password-store/Android-Password-Store/discussions): Use it if you do not understand something, or want to discuss a feature request in more detail with all community members before pitching it to maintainers.
-
-## Donations
-
-The project accepts financial contributions through the following platforms
-
-- [GitHub Sponsors](https://github.com/sponsors/android-password-store)
-- [OpenCollective](https://opencollective.com/android-password-store)
 
 <sub>Google Play and the Google Play logo are trademarks of Google LLC.</sub>
