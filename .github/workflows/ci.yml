@@ -1,6 +1,7 @@
 on:
   push:
     branches:
+      - main
       - develop
   pull_request:
   workflow_dispatch:
@@ -14,7 +15,7 @@ concurrency:
 env:
   # Upstream injects a real DSN from secrets. A fork has none, and the build only
   # requires the value to be well-formed, not valid.
-  SENTRY_DSN: 'https://public_key@example.com/project_id'
+  SENTRY_DSN: "https://public_key@example.com/project_id"
 
 jobs:
   build:
