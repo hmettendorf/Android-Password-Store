@@ -48,7 +48,21 @@ See https://docs.passwordstore.app/docs/users/release-channels/
 
 ## Documentation
 
-We're in the process of rewriting our documentation from scratch, and the work-in-progress state can be seen [here](https://docs.passwordstore.app). See the [wiki](https://github.com/android-password-store/Android-Password-Store/wiki/) for the old documentation.
+### API reference
+
+The library modules -- `autofill-parser`, `coroutine-utils`, `crypto`, `format` and `passgen` -- have generated API documentation at **<https://hmettendorf.github.io/Android-Password-Store/>**, rebuilt and published on every push to `main`. Every symbol links back to the line of source it came from in this repository.
+
+To build the same site locally:
+
+```shell
+./gradlew dokkaGenerate
+```
+
+It is written to `build/dokka/html`; open `index.html` from there.
+
+### User documentation
+
+The prose documentation is the original project's and has not been touched since it was archived: the [documentation site](https://docs.passwordstore.app), and the older [wiki](https://github.com/android-password-store/Android-Password-Store/wiki/). Both still describe how the app works, since this fork has not changed any of its concepts, but neither of them covers anything listed under [What's new in this fork](#whats-new-in-this-fork).
 
 ## Contributing
 
