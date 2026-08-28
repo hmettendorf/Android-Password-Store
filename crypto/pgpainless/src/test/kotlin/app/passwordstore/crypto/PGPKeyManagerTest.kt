@@ -117,6 +117,35 @@ class PGPKeyManagerTest {
     }
 
   @Test
+  fun splitKeyringSeparatesConcatenatedKeys() {
+    // gpg --export writes the requested keys as one block, and reading it as a single keyring
+    // silently keeps the first and discards the rest.
+    val keys = KeyUtils.splitKeyring(PGPKey(TestUtils.getMultiplePublicKeys()))
+    assertEquals(2, keys.size)
+    assertEquals(
+      listOf(KeyId(CryptoConstants.KEY_ID), KeyId(CryptoConstants.MULTIPLE_IDENTITIES_KEY_ID)),
+      keys.map { key -> tryGetId(key) },
+    )
+  }
+
+  @Test
+  fun splitKeyringReturnsSingleKeyUnchanged() {
+    val keys = KeyUtils.splitKeyring(PGPKey(TestUtils.getArmoredPublicKey()))
+    assertEquals(1, keys.size)
+    assertEquals(KeyId(CryptoConstants.KEY_ID), tryGetId(keys.single()))
+  }
+
+  @Test
+  fun addingEveryKeyFromABlockKeepsThemAllRetrievable() =
+    runTest(dispatcher) {
+      KeyUtils.splitKeyring(PGPKey(TestUtils.getMultiplePublicKeys())).forEach { key ->
+        keyManager.addKey(key).unwrap()
+      }
+      assertEquals(2, keyManager.getAllKeys().unwrap().size)
+      keyManager.getKeyById(KeyId(CryptoConstants.MULTIPLE_IDENTITIES_KEY_ID)).unwrap()
+    }
+
+  @Test
   fun getKeyBySubkeyId() =
     runTest(dispatcher) {
       keyManager.addKey(secretKey).unwrap()

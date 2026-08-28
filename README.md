@@ -32,6 +32,7 @@ Upstream development stopped in October 2024. This fork picks the project back u
 ### Encryption and storage
 
 * **Jetpack Security replaced with the Android Keystore.** `androidx.security:security-crypto` is deprecated in full and pinned to a long-outdated Tink. Encrypted storage now sits on AES-GCM keys held directly in the Android Keystore, with DataStore for persistence, optional user-authentication binding and optional StrongBox. Existing data is migrated on first launch: the legacy store is only discarded after the new copy has been read back, and the keystore-wrapped SSH key is re-wrapped under a separate alias so a failure leaves the original untouched.
+* **Passwords are encrypted for every recipient, or not at all.** Recipients in `.gpg-id` whose keys were not imported used to be dropped silently, producing an entry only the phone could read — and, on an edit, quietly revoking access others already had. Saving now fails with the missing recipients named. Entries naming a subkey rather than a primary key resolve correctly too, and importing a key file adds every key in it instead of only the first.
 * **`.gpg-id` files using GnuPG's exact-key marker now work.** An entry such as `0xCA14231C6693C21B!` no longer invalidates the whole file and discards the other recipients in it.
 * **Fewer latent crashes on empty input.** Password, OTP and git-credential fields no longer throw on a null editable; empty input is now read as an empty string.
 
