@@ -511,7 +511,12 @@ class PasswordCreationActivity : BasePGPActivity() {
   }
 
   /**
-   * Push the store to its remote, unless the user has turned [PreferenceKeys.AUTO_PUSH] off.
+   * Offer to push the store to its remote, unless the user has turned [PreferenceKeys.AUTO_PUSH]
+   * off.
+   *
+   * The push is always confirmed first. A push is an outward-facing action -- it publishes the new
+   * entry to a remote others may read, and can prompt for a key passphrase or biometric -- so the
+   * preference controls whether the offer is made, not whether the network is used unasked.
    *
    * This runs after the entry has already been committed, so a failure here is not a failure to
    * save: it is reported and then dropped, leaving the commit to go out with the next push or sync.
@@ -521,11 +526,28 @@ class PasswordCreationActivity : BasePGPActivity() {
     if (!PasswordRepository.isInitialized) return
     // No remote to push to. Not worth an error; the store is simply local-only.
     if (gitSettings.url == null) return
+    if (!confirmPush()) return
     PushOperation(this).executeAfterAuthentication(gitSettings.authMode).onErr { err ->
       logcat(ERROR) { err.asLog() }
       // Declining the biometric prompt is a decision, not an error.
       if (!isAuthCancellation(err)) promptAutoPushError(err)
     }
+  }
+
+  /**
+   * Ask whether to push now, suspending until the user answers. Declining -- with the button or by
+   * dismissing the dialog -- leaves the commit local, which is exactly the state the app was in
+   * before this feature existed.
+   */
+  private suspend fun confirmPush(): Boolean = suspendCoroutine { cont ->
+    var confirmed = false
+    MaterialAlertDialogBuilder(this)
+      .setTitle(R.string.auto_push_confirm_title)
+      .setMessage(R.string.auto_push_confirm_message)
+      .setPositiveButton(R.string.auto_push_confirm_push) { _, _ -> confirmed = true }
+      .setNegativeButton(R.string.auto_push_confirm_later) { _, _ -> }
+      .setOnDismissListener { cont.resume(confirmed) }
+      .show()
   }
 
   /** Report a failed auto push and suspend until the user dismisses it, so [finish] can wait. */
