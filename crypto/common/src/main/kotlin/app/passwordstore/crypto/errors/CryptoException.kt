@@ -53,6 +53,19 @@ public class NonStandardAEAD(cause: Throwable) :
 /** No keys were passed to the encrypt/decrypt operation. */
 public data object NoKeysProvidedException : CryptoHandlerException(null, null)
 
+/**
+ * Some of the recipients a file must be encrypted to could not be resolved to an imported key.
+ *
+ * Encryption is refused rather than narrowed: dropping a recipient produces a file that looks saved
+ * but that the dropped recipient can no longer read, and for an edit of an existing entry that is
+ * silent data loss.
+ */
+public class MissingRecipientKeysException(public val recipients: List<String>) :
+  CryptoHandlerException(
+    "No imported key matches ${recipients.size} of the recipients this file must be encrypted to: " +
+      recipients.joinToString()
+  )
+
 /** An unexpected error that cannot be mapped to a known type. */
 public class UnknownError(cause: Throwable, message: String? = null) :
   CryptoHandlerException(message, cause)

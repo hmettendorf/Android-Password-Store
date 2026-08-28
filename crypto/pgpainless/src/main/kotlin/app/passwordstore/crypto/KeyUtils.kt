@@ -30,6 +30,36 @@ public object KeyUtils {
   }
 
   /**
+   * Splits [key] into one [PGPKey] per keyring it contains.
+   *
+   * `gpg --export` concatenates every key it was asked for into a single block, so a file picked
+   * for import routinely holds several. [tryParseKeyring] reads only the first keyring in a stream,
+   * which would import one key and drop the rest without saying so.
+   */
+  public fun splitKeyring(key: PGPKey): List<PGPKey> {
+    val collection =
+      runCatching { KeyRingReader.readKeyRingCollection(key.contents.inputStream(), true) }.get()
+        ?: return emptyList()
+    val keyRings = buildList {
+      collection.getPGPSecretKeyRingCollection().forEach { ring -> add(ring) }
+      collection.getPgpPublicKeyRingCollection().forEach { ring -> add(ring) }
+    }
+    return keyRings.map { keyRing -> PGPKey(keyRing.encoded) }
+  }
+
+  /**
+   * Every key ID in [key]'s ring: the primary key's, and each subkey's.
+   *
+   * `pass` and `gopass` write `.gpg-id` entries through from GnuPG verbatim, and GnuPG names
+   * whichever key the user pinned -- frequently an encryption subkey rather than the primary. A
+   * lookup that only compares [tryGetId] therefore fails to find keys that are in fact present.
+   */
+  public fun tryGetAllIds(key: PGPKey): List<KeyId> {
+    val keyRing = tryParseKeyring(key) ?: return emptyList()
+    return keyRing.publicKeys.asSequence().map { publicKey -> KeyId(publicKey.keyID) }.toList()
+  }
+
+  /**
    * Attempts to parse the given [PGPKey] into a [PGPKeyRing] and obtains the [UserId] of the
    * corresponding public key.
    */

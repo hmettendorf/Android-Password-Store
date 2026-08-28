@@ -17,6 +17,10 @@ object TestUtils {
   fun getArmoredPublicKeyWithMultipleIdentities() =
     this::class.java.classLoader.getResource("public_key_multiple_identities").readBytes()
 
+  /** Two armored public keys concatenated, as `gpg --export --armor A B` emits them. */
+  fun getMultiplePublicKeys() =
+    this::class.java.classLoader.getResource("multiple_public_keys").readBytes()
+
   /** An Ed25519 key with no encryption subkey, so nothing can ever be encrypted to it. */
   fun getSignOnlySecretKey() = this::class.java.classLoader.getResource("sign_only_sec").readBytes()
 

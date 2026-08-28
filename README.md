@@ -21,9 +21,9 @@ Upstream development stopped in October 2024. This fork picks the project back u
 
 ### Git
 
-* **Auto push.** Saving a password pushes it to the remote straight away, instead of leaving the commit sitting locally until you next sync by hand. It covers edits as well as new entries, and applies wherever an entry is saved from — the password list, the decrypt screen, or an Autofill save prompt.
+* **Auto push.** Saving a password offers to push it to the remote straight away, instead of leaving the commit sitting locally until you next sync by hand. It covers edits as well as new entries, and applies wherever an entry is saved from — the password list, the decrypt screen, or an Autofill save prompt.
 
-  It is **on by default**, and can be turned off under **Settings → Passwords → Auto push**.
+  **The push is always confirmed first** — publishing to a remote is not something the app does behind your back. The setting decides whether the offer is made at all: it is **on by default**, and can be turned off under **Settings → Passwords → Auto push**.
 
   Pushing uses the Git remote and authentication you have already configured, so an SSH key that asks for biometric unlock will still ask. Nothing happens if the store has no remote — a local-only store is left alone rather than reporting an error.
 
@@ -32,6 +32,7 @@ Upstream development stopped in October 2024. This fork picks the project back u
 ### Encryption and storage
 
 * **Jetpack Security replaced with the Android Keystore.** `androidx.security:security-crypto` is deprecated in full and pinned to a long-outdated Tink. Encrypted storage now sits on AES-GCM keys held directly in the Android Keystore, with DataStore for persistence, optional user-authentication binding and optional StrongBox. Existing data is migrated on first launch: the legacy store is only discarded after the new copy has been read back, and the keystore-wrapped SSH key is re-wrapped under a separate alias so a failure leaves the original untouched.
+* **Passwords are encrypted for every recipient, or not at all.** Recipients in `.gpg-id` whose keys were not imported used to be dropped silently, producing an entry only the phone could read — and, on an edit, quietly revoking access others already had. Saving now fails with the missing recipients named. Entries naming a subkey rather than a primary key resolve correctly too, and importing a key file adds every key in it instead of only the first.
 * **`.gpg-id` files using GnuPG's exact-key marker now work.** An entry such as `0xCA14231C6693C21B!` no longer invalidates the whole file and discards the other recipients in it.
 * **Fewer latent crashes on empty input.** Password, OTP and git-credential fields no longer throw on a null editable; empty input is now read as an empty string.
 
@@ -48,7 +49,21 @@ See https://docs.passwordstore.app/docs/users/release-channels/
 
 ## Documentation
 
-We're in the process of rewriting our documentation from scratch, and the work-in-progress state can be seen [here](https://docs.passwordstore.app). See the [wiki](https://github.com/android-password-store/Android-Password-Store/wiki/) for the old documentation.
+### API reference
+
+The library modules -- `autofill-parser`, `coroutine-utils`, `crypto`, `format` and `passgen` -- have generated API documentation at **<https://hmettendorf.github.io/Android-Password-Store/>**, rebuilt and published on every push to `main`. Every symbol links back to the line of source it came from in this repository.
+
+To build the same site locally:
+
+```shell
+./gradlew dokkaGenerate
+```
+
+It is written to `build/dokka/html`; open `index.html` from there.
+
+### User documentation
+
+The prose documentation is the original project's and has not been touched since it was archived: the [documentation site](https://docs.passwordstore.app), and the older [wiki](https://github.com/android-password-store/Android-Password-Store/wiki/). Both still describe how the app works, since this fork has not changed any of its concepts, but neither of them covers anything listed under [What's new in this fork](#whats-new-in-this-fork).
 
 ## Contributing
 
