@@ -61,8 +61,17 @@ private const val ANDROIDX_SECURITY_KEYSET_PREF_NAME = "androidx_sshkey_keyset_p
  */
 private const val KEYSTORE_WRAP_ALIAS = "sshkey_wrap"
 
+/**
+ * Wrapping key for [SshKey.Type.Imported] and [SshKey.Type.LegacyGenerated] keys. Separate from
+ * [KEYSTORE_WRAP_ALIAS] so that re-importing a key cannot disturb a generated one, and vice versa.
+ */
+private const val KEYSTORE_IMPORTED_WRAP_ALIAS = "sshkey_imported_wrap"
+
 /** Matches the validity window the legacy wrapping MasterKey was created with. */
 private const val WRAP_KEY_AUTH_VALIDITY_SECONDS = 15
+
+/** Replacement key material is staged here so a failure never destroys the only copy. */
+private const val STAGING_KEY_FILE_NAME = ".ssh_key.migrating"
 
 private val androidKeystore: KeyStore by unsafeLazy {
   KeyStore.getInstance(PROVIDER_ANDROID_KEY_STORE).apply { load(null) }
@@ -102,8 +111,7 @@ object SshKey {
       return runCatching {
           if (type !in listOf(Type.KeystoreNative, Type.KeystoreWrappedEd25519)) return false
           val alias =
-            if (type == Type.KeystoreWrappedEd25519 && !legacyWrappedKeyExists())
-              KEYSTORE_WRAP_ALIAS
+            if (type == Type.KeystoreWrappedEd25519 && !legacyWrappedKeyInUse()) KEYSTORE_WRAP_ALIAS
             else KEYSTORE_ALIAS
           when (val key = androidKeystore.getKey(alias, null)) {
             is PrivateKey -> {
@@ -192,7 +200,8 @@ object SshKey {
   private fun delete() {
     androidKeystore.deleteEntry(KEYSTORE_ALIAS)
     androidKeystore.deleteEntry(KEYSTORE_WRAP_ALIAS)
-    File(context.filesDir, ".ssh_key.migrating").delete()
+    androidKeystore.deleteEntry(KEYSTORE_IMPORTED_WRAP_ALIAS)
+    File(context.filesDir, STAGING_KEY_FILE_NAME).delete()
     // Remove Tink key set used by AndroidX's EncryptedFile.
     context.getSharedPreferences(ANDROIDX_SECURITY_KEYSET_PREF_NAME, Context.MODE_PRIVATE).edit {
       clear()
@@ -245,7 +254,7 @@ object SshKey {
     // key and delete the old key.
     delete()
     // Canonicalize line endings to '\n'.
-    privateKeyFile.writeText(lines.joinToString("\n"))
+    writeImportedPrivateKey(lines.joinToString("\n"))
 
     type = Type.Imported
   }
@@ -277,12 +286,74 @@ object SshKey {
   private fun readWrappedPrivateKey(source: File = privateKeyFile): ByteArray =
     wrappingCipher(requireAuthentication = false).decrypt(source.readBytes())
 
-  /** True while the private key is still stored in the legacy `EncryptedFile` format. */
+  /** Wrapping key for imported and legacy-generated keys, which are stored verbatim. */
+  private fun importedKeyCipher() =
+    KeystoreCipher(context = context, alias = KEYSTORE_IMPORTED_WRAP_ALIAS, preferStrongBox = true)
+
+  /** Encrypts an imported private key, which is held as text rather than as a raw seed. */
+  private fun writeImportedPrivateKey(contents: String, target: File = privateKeyFile) {
+    target.writeBytes(importedKeyCipher().encrypt(contents.toByteArray()))
+  }
+
+  /**
+   * Returns the imported private key, encrypting it at rest first if it predates that.
+   *
+   * Imported keys used to be written to disk verbatim while generated ones were Keystore-wrapped. A
+   * key that arrived under the old behaviour is re-written on first use so both kinds end up
+   * equally protected.
+   */
+  private fun readImportedPrivateKey(): String {
+    val stored = privateKeyFile.readBytes()
+    if (KeystoreCipher.isEncryptedPayload(stored)) {
+      return importedKeyCipher().decrypt(stored).decodeToString()
+    }
+    val contents = stored.decodeToString()
+    encryptImportedPrivateKey(contents)
+    return contents
+  }
+
+  /**
+   * Re-writes a plaintext imported key as ciphertext.
+   *
+   * Every failure path here is non-destructive: the plaintext file is not touched until the
+   * replacement has been written and read back, so an interrupted attempt simply runs again.
+   */
+  private fun encryptImportedPrivateKey(contents: String) {
+    val staging = File(context.filesDir, STAGING_KEY_FILE_NAME)
+    runCatching {
+        androidKeystore.deleteEntry(KEYSTORE_IMPORTED_WRAP_ALIAS)
+        writeImportedPrivateKey(contents, staging)
+        check(importedKeyCipher().decrypt(staging.readBytes()).decodeToString() == contents) {
+          "Encrypted SSH key did not read back identically"
+        }
+        check(staging.renameTo(privateKeyFile)) { "Could not replace the private key file" }
+        logcat(INFO) { "Encrypted the imported SSH key at rest" }
+      }
+      .onErr { error ->
+        staging.delete()
+        androidKeystore.deleteEntry(KEYSTORE_IMPORTED_WRAP_ALIAS)
+        logcat(ERROR) { "Could not encrypt the imported SSH key, leaving it: ${error.asLog()}" }
+      }
+  }
+
+  /** True while the Tink key set for the legacy `EncryptedFile` is still present. */
   private fun legacyWrappedKeyExists() =
     context
       .getSharedPreferences(ANDROIDX_SECURITY_KEYSET_PREF_NAME, Context.MODE_PRIVATE)
       .all
       .isNotEmpty()
+
+  /**
+   * True while the private key on disk is *actually* still in the legacy `EncryptedFile` format.
+   *
+   * The file itself is the only trustworthy record. The Tink key set outlives a crash between
+   * swapping the file and clearing it, and trusting the key set alone would send a key that has
+   * already been converted back through a migration that cannot succeed.
+   */
+  private fun legacyWrappedKeyInUse() =
+    privateKeyFile.isFile &&
+      !KeystoreCipher.isEncryptedPayload(privateKeyFile.readBytes()) &&
+      legacyWrappedKeyExists()
 
   // androidx.security:security-crypto is deprecated; this is the read side of the migration away
   // from it and is deleted once the deprecation window closes.
@@ -315,39 +386,84 @@ object SshKey {
    * Re-wraps a keystore-wrapped ed25519 key from the deprecated `EncryptedFile` onto the Keystore
    * cipher.
    *
-   * The replacement is written to a temporary file and read back before it replaces the original,
-   * so a failure at any point leaves the legacy key intact and the next attempt can retry. Losing
-   * this key is unrecoverable: the user would have to generate a new one and re-register it with
-   * their git host.
+   * The replacement is written to a staging file and read back before it replaces the original, so
+   * a failure before the swap leaves the legacy key intact and the next attempt can retry. After
+   * the swap the new wrapping key is the only thing that can read the key material, so nothing past
+   * that point may delete it -- losing it is unrecoverable, and the user would have to generate a
+   * new key and re-register it with their git host.
    */
   private fun migrateWrappedEd25519Key() {
-    if (type != Type.KeystoreWrappedEd25519 || !legacyWrappedKeyExists()) return
+    if (type != Type.KeystoreWrappedEd25519 || !privateKeyFile.isFile) return
+    if (!legacyWrappedKeyInUse()) {
+      // Either there was never anything to migrate, or a previous run swapped the file and was
+      // interrupted before it could clean up. Both are finished as far as the key is concerned.
+      discardLegacyWrappingKey()
+      return
+    }
 
-    val staging = File(context.filesDir, ".ssh_key.migrating")
-    runCatching {
-        val seed = legacyEncryptedFile().openFileInput().use { it.readBytes() }
-        // Refuse to proceed unless the bytes really are a usable ed25519 key.
-        EdDSAPrivateKey(EdDSAPrivateKeySpec(seed, EdDSANamedCurveTable.ED_25519_CURVE_SPEC))
-
-        val requiresAuth = legacyWrapKeyRequiresAuth()
-        androidKeystore.deleteEntry(KEYSTORE_WRAP_ALIAS)
-        writeWrappedPrivateKey(seed, requiresAuth, staging)
-        check(readWrappedPrivateKey(staging).contentEquals(seed)) {
-          "Re-wrapped ed25519 key did not read back identically"
+    val seed =
+      runCatching {
+          val bytes = legacyEncryptedFile().openFileInput().use { it.readBytes() }
+          // Refuse to proceed unless the bytes really are a usable ed25519 key.
+          EdDSAPrivateKey(EdDSAPrivateKeySpec(bytes, EdDSANamedCurveTable.ED_25519_CURVE_SPEC))
+          bytes
+        }
+        .getOrElse { error ->
+          logcat(ERROR) { "Could not read the legacy ed25519 key, keeping it: ${error.asLog()}" }
+          return
         }
 
-        // Point of no return: everything above is verified, so the swap is safe.
-        check(staging.renameTo(privateKeyFile)) { "Could not replace the private key file" }
-        context
-          .getSharedPreferences(ANDROIDX_SECURITY_KEYSET_PREF_NAME, Context.MODE_PRIVATE)
-          .edit { clear() }
+    val staging = File(context.filesDir, STAGING_KEY_FILE_NAME)
+    val prepared =
+      runCatching {
+          val requiresAuth = legacyWrapKeyRequiresAuth()
+          androidKeystore.deleteEntry(KEYSTORE_WRAP_ALIAS)
+          writeWrappedPrivateKey(seed, requiresAuth, staging)
+          check(readWrappedPrivateKey(staging).contentEquals(seed)) {
+            "Re-wrapped ed25519 key did not read back identically"
+          }
+        }
+        .onErr { error ->
+          // The swap has not happened, so the legacy key is still the only copy and the
+          // half-built replacement is worth nothing. Safe to discard both.
+          staging.delete()
+          androidKeystore.deleteEntry(KEYSTORE_WRAP_ALIAS)
+          logcat(ERROR) {
+            "Could not re-wrap ed25519 key, keeping the legacy key: ${error.asLog()}"
+          }
+        }
+    if (prepared.isErr) return
+
+    if (!staging.renameTo(privateKeyFile)) {
+      // Still before the swap: the legacy key is untouched, so rolling back is safe.
+      staging.delete()
+      androidKeystore.deleteEntry(KEYSTORE_WRAP_ALIAS)
+      logcat(ERROR) { "Could not replace the private key file, keeping the legacy key" }
+      return
+    }
+
+    // Past the point of no return. Anything that fails from here leaves a usable key behind and
+    // is retried on the next call, so no failure may reach back and delete KEYSTORE_WRAP_ALIAS.
+    discardLegacyWrappingKey()
+    logcat(INFO) { "Re-wrapped ed25519 SSH key onto the Keystore cipher" }
+  }
+
+  /**
+   * Drops the Tink key set and MasterKey behind the deprecated `EncryptedFile`, once the key
+   * material they protected has been re-wrapped. Never touches [KEYSTORE_WRAP_ALIAS].
+   */
+  private fun discardLegacyWrappingKey() {
+    runCatching {
+        if (legacyWrappedKeyExists()) {
+          context
+            .getSharedPreferences(ANDROIDX_SECURITY_KEYSET_PREF_NAME, Context.MODE_PRIVATE)
+            .edit { clear() }
+        }
         androidKeystore.deleteEntry(KEYSTORE_ALIAS)
-        logcat(INFO) { "Re-wrapped ed25519 SSH key onto the Keystore cipher" }
       }
       .onErr { error ->
-        staging.delete()
-        androidKeystore.deleteEntry(KEYSTORE_WRAP_ALIAS)
-        logcat(ERROR) { "Could not re-wrap ed25519 key, keeping the legacy key: ${error.asLog()}" }
+        // Cosmetic leftovers. The key itself is already safe on the new wrapping key.
+        logcat(ERROR) { "Could not clear the legacy wrapping key: ${error.asLog()}" }
       }
   }
 
@@ -400,8 +516,10 @@ object SshKey {
 
   fun provide(client: SSHClient, passphraseFinder: InteractivePasswordFinder): KeyProvider? =
     when (type) {
+      // Loaded from memory rather than by path: the file is ciphertext now, and sshj would
+      // otherwise be handed a payload it cannot parse.
       Type.LegacyGenerated,
-      Type.Imported -> client.loadKeys(privateKeyFile.absolutePath, passphraseFinder)
+      Type.Imported -> client.loadKeys(readImportedPrivateKey(), null, passphraseFinder)
       Type.KeystoreNative -> KeystoreNativeKeyProvider
       Type.KeystoreWrappedEd25519 -> KeystoreWrappedEd25519KeyProvider
       null -> null

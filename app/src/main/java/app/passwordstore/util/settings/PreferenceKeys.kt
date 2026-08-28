@@ -8,6 +8,7 @@ package app.passwordstore.util.settings
 object PreferenceKeys {
 
   const val APP_THEME = "app_theme"
+  const val AUTO_PUSH = "auto_push"
   const val AUTOFILL_ENABLE = "autofill_enable"
   const val BIOMETRIC_AUTH = "biometric_auth"
   const val BIOMETRIC_AUTH_2 = "biometric_auth_delete_soon_please"

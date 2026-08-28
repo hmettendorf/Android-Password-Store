@@ -1,20 +1,22 @@
 {
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:base",
+    "config:recommended",
     ":dependencyDashboard",
     "helpers:pinGitHubActionDigests",
   ],
   "branchConcurrentLimit": 15,
   "github-actions": {
-    "fileMatch": [
-       ".github/reusable-workflows/.+\\.ya?ml$",
+    // Additive: the manager's default patterns for .github/workflows still apply.
+    "managerFilePatterns": [
+      "/.github/reusable-workflows/.+\\.ya?ml$/",
     ],
   },
   "packageRules": [
     {
       "description": "Automerge non-major updates",
       "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true
+      "automerge": true,
     },
     {
       matchDatasources: [
@@ -27,45 +29,53 @@
       ],
     },
     {
-      "matchPackagePatterns": [
-        "^androidx.*",
-      ],
-      "groupName": "androidx"
+      "groupName": "androidx",
+      "matchPackageNames": ["/^androidx.*/"],
     },
     {
       // Compose compiler is tightly coupled to Kotlin version
       "groupName": "Kotlin and Compose",
-      "matchPackagePrefixes": [
-        "androidx.compose.compiler",
-        "org.jetbrains.kotlin",
+      "matchPackageNames": [
+        "androidx.compose.compiler{/,}**",
+        "org.jetbrains.kotlin{/,}**",
       ],
     },
     {
-      "matchPackagePatterns": [
-        "^io.sentry",
-        "^sentry",
-      ],
-      "groupName": "sentry"
+      "groupName": "sentry",
+      "matchPackageNames": ["/^io.sentry/", "/^sentry/"],
     },
     {
-      "managers": [
-        "gradle"
-      ],
-      "matchPackagePatterns": [
+      "matchManagers": ["gradle"],
+      "matchPackageNames": [
         // Later versions require newer JDKs
-        "^org.eclipse.jgit",
+        "/^org.eclipse.jgit/",
         // AGP dictates the version we can use
-        "^com.android.tools:desugar_jdk_libs",
+        "/^com.android.tools:desugar_jdk_libs/",
         // Later versions require newer JDKs
-        "^commons-codec:commons-codec",
+        "/^commons-codec:commons-codec/",
       ],
-      "enabled": false
+      "enabled": false,
+    },
+    {
+      // af7bc9e4 caps these on AGP 8: AGP 9 removes TestedExtension,
+      // compileSdkVersion() and packagingOptions, which build-logic still uses,
+      // and Gradle 9.6 removes InternalProblems, which AGP 8 still uses. They are
+      // left enabled so the PRs still show up, but never automerged -- a human has
+      // to decide whether build-logic is ready. Drop this rule once it is ported.
+      "description": "Toolchain updates gated on the AGP 9 port",
+      "matchPackageNames": [
+        "/^com.android.tools.build:gradle$/",
+        "/^com.google.dagger:hilt/",
+        "/^gradle$/",
+      ],
+      "automerge": false,
     },
   ],
-  "regexManagers": [
+  "customManagers": [
     {
-      "fileMatch": [
-        "gradle/libs.versions.toml"
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/gradle/libs.versions.toml/",
       ],
       "matchStrings": [
         "composeCompiler = \"(?<currentValue>.*)\""
@@ -75,8 +85,9 @@
       "registryUrlTemplate": "https://maven.google.com",
     },
     {
-      "fileMatch": [
-        "build-logic/src/main/kotlin/app/passwordstore/gradle/SpotlessPlugin.kt"
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/build-logic/src/main/kotlin/app/passwordstore/gradle/SpotlessPlugin.kt/",
       ],
       "matchStrings": [
         "KTFMT_VERSION = \"(?<currentValue>.*)\""

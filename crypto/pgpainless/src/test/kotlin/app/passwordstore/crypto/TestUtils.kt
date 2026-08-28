@@ -17,6 +17,9 @@ object TestUtils {
   fun getArmoredPublicKeyWithMultipleIdentities() =
     this::class.java.classLoader.getResource("public_key_multiple_identities").readBytes()
 
+  /** An Ed25519 key with no encryption subkey, so nothing can ever be encrypted to it. */
+  fun getSignOnlySecretKey() = this::class.java.classLoader.getResource("sign_only_sec").readBytes()
+
   fun getAEADPublicKey() = this::class.java.classLoader.getResource("aead_pub").readBytes()
 
   fun getAEADSecretKey() = this::class.java.classLoader.getResource("aead_sec").readBytes()

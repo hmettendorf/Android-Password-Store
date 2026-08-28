@@ -40,23 +40,29 @@ class ProxyUtils @Inject constructor(private val gitSettings: GitSettings) {
         }
       }
     )
-    val user = gitSettings.proxyUsername ?: ""
-    val password = gitSettings.proxyPassword ?: ""
-    if (user.isEmpty() || password.isEmpty()) {
-      System.clearProperty(HTTP_PROXY_USER_PROPERTY)
-      System.clearProperty(HTTP_PROXY_PASSWORD_PROPERTY)
-    } else {
-      System.setProperty(HTTP_PROXY_USER_PROPERTY, user)
-      System.setProperty(HTTP_PROXY_PASSWORD_PROPERTY, password)
-    }
+    // The credentials are deliberately not mirrored into the http.proxyUser and
+    // http.proxyPassword system properties. Those are process-global, outlive the setting that
+    // produced them, and put the password somewhere every library in the process -- and every
+    // heap dump -- can read it. The Authenticator below covers the same ground. Clearing them
+    // here also cleans up after versions of the app that did set them.
+    System.clearProperty(HTTP_PROXY_USER_PROPERTY)
+    System.clearProperty(HTTP_PROXY_PASSWORD_PROPERTY)
+
     Authenticator.setDefault(
       object : Authenticator() {
+        // Read on demand rather than captured, so the credentials are not held for the lifetime
+        // of the process and a settings change takes effect immediately.
         override fun getPasswordAuthentication(): PasswordAuthentication? {
-          return if (requestorType == RequestorType.PROXY) {
-            PasswordAuthentication(user, password.toCharArray())
-          } else {
-            null
-          }
+          if (requestorType != RequestorType.PROXY) return null
+          val host = gitSettings.proxyHost ?: return null
+          val port = gitSettings.proxyPort
+          // Answer only for the proxy we were actually configured with. The default
+          // Authenticator is consulted for every proxy any code in this process talks to.
+          if (!host.equals(requestingHost, ignoreCase = true)) return null
+          if (port != -1 && port != requestingPort) return null
+          val user = gitSettings.proxyUsername?.takeIf { it.isNotEmpty() } ?: return null
+          val password = gitSettings.proxyPassword?.takeIf { it.isNotEmpty() } ?: return null
+          return PasswordAuthentication(user, password.toCharArray())
         }
       }
     )

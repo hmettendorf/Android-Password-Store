@@ -43,6 +43,11 @@ class PasswordSettings(private val activity: FragmentActivity) : SettingsProvide
         summaryRes = R.string.pref_copy_summary
         defaultValue = false
       }
+      switch(PreferenceKeys.AUTO_PUSH) {
+        titleRes = R.string.pref_auto_push_title
+        summaryRes = R.string.pref_auto_push_summary
+        defaultValue = true
+      }
     }
   }
 }

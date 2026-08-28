@@ -25,6 +25,7 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.lifecycle.lifecycleScope
 import app.passwordstore.R
 import app.passwordstore.data.passfile.PasswordEntry
+import app.passwordstore.data.repo.PasswordRepository
 import app.passwordstore.databinding.PasswordCreationActivityBinding
 import app.passwordstore.ui.dialogs.DicewarePasswordGeneratorDialogFragment
 import app.passwordstore.ui.dialogs.OtpImportDialogFragment
@@ -38,7 +39,10 @@ import app.passwordstore.util.extensions.isInsideRepository
 import app.passwordstore.util.extensions.snackbar
 import app.passwordstore.util.extensions.unsafeLazy
 import app.passwordstore.util.extensions.viewBinding
+import app.passwordstore.util.git.ErrorMessages
+import app.passwordstore.util.git.operation.PushOperation
 import app.passwordstore.util.settings.DirectoryStructure
+import app.passwordstore.util.settings.GitSettings
 import app.passwordstore.util.settings.PreferenceKeys
 import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.onOk
@@ -56,6 +60,8 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.nio.file.Paths
 import javax.inject.Inject
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.createDirectories
 import kotlin.io.path.deleteIfExists
@@ -70,12 +76,15 @@ import kotlinx.coroutines.withContext
 import logcat.LogPriority.ERROR
 import logcat.asLog
 import logcat.logcat
+import net.schmizz.sshj.common.DisconnectReason
+import net.schmizz.sshj.common.SSHException
 
 @AndroidEntryPoint
 class PasswordCreationActivity : BasePGPActivity() {
 
   private val binding by viewBinding(PasswordCreationActivityBinding::inflate)
   @Inject lateinit var passwordEntryFactory: PasswordEntry.Factory
+  @Inject lateinit var gitSettings: GitSettings
 
   private val suggestedName by unsafeLazy { intent.getStringExtra(EXTRA_FILE_NAME) }
   private val suggestedUsername by unsafeLazy { intent.getStringExtra(EXTRA_USERNAME) }
@@ -454,6 +463,7 @@ class PasswordCreationActivity : BasePGPActivity() {
                   resources.getString(commitMessageRes, getLongName(fullPath, repoPath, editName))
                 )
                 .onOk {
+                  autoPush()
                   setResult(RESULT_OK, returnIntent)
                   finish()
                 }
@@ -475,6 +485,46 @@ class PasswordCreationActivity : BasePGPActivity() {
           }
       }
     }
+  }
+
+  /**
+   * Push the store to its remote, unless the user has turned [PreferenceKeys.AUTO_PUSH] off.
+   *
+   * This runs after the entry has already been committed, so a failure here is not a failure to
+   * save: it is reported and then dropped, leaving the commit to go out with the next push or sync.
+   */
+  private suspend fun autoPush() {
+    if (!settings.getBoolean(PreferenceKeys.AUTO_PUSH, true)) return
+    if (!PasswordRepository.isInitialized) return
+    // No remote to push to. Not worth an error; the store is simply local-only.
+    if (gitSettings.url == null) return
+    PushOperation(this).executeAfterAuthentication(gitSettings.authMode).onErr { err ->
+      logcat(ERROR) { err.asLog() }
+      // Declining the biometric prompt is a decision, not an error.
+      if (!isAuthCancellation(err)) promptAutoPushError(err)
+    }
+  }
+
+  /** Report a failed auto push and suspend until the user dismisses it, so [finish] can wait. */
+  private suspend fun promptAutoPushError(err: Throwable) = suspendCoroutine { cont ->
+    MaterialAlertDialogBuilder(this)
+      .setTitle(R.string.auto_push_error_dialog_title)
+      .setMessage(ErrorMessages[err])
+      .setPositiveButton(R.string.dialog_ok) { _, _ -> }
+      .setOnDismissListener { cont.resume(Unit) }
+      .show()
+  }
+
+  private fun isAuthCancellation(throwable: Throwable): Boolean {
+    var cause: Throwable? = throwable
+    while (cause != null) {
+      if (
+        cause is SSHException && cause.disconnectReason == DisconnectReason.AUTH_CANCELLED_BY_USER
+      )
+        return true
+      cause = cause.cause
+    }
+    return false
   }
 
   companion object {
