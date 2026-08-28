@@ -21,9 +21,9 @@ Upstream development stopped in October 2024. This fork picks the project back u
 
 ### Git
 
-* **Auto push.** Saving a password pushes it to the remote straight away, instead of leaving the commit sitting locally until you next sync by hand. It covers edits as well as new entries, and applies wherever an entry is saved from — the password list, the decrypt screen, or an Autofill save prompt.
+* **Auto push.** Saving a password offers to push it to the remote straight away, instead of leaving the commit sitting locally until you next sync by hand. It covers edits as well as new entries, and applies wherever an entry is saved from — the password list, the decrypt screen, or an Autofill save prompt.
 
-  It is **on by default**, and can be turned off under **Settings → Passwords → Auto push**.
+  **The push is always confirmed first** — publishing to a remote is not something the app does behind your back. The setting decides whether the offer is made at all: it is **on by default**, and can be turned off under **Settings → Passwords → Auto push**.
 
   Pushing uses the Git remote and authentication you have already configured, so an SSH key that asks for biometric unlock will still ask. Nothing happens if the store has no remote — a local-only store is left alone rather than reporting an error.
 

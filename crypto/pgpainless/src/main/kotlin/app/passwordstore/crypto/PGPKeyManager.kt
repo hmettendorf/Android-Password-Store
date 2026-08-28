@@ -8,6 +8,7 @@ package app.passwordstore.crypto
 
 import androidx.annotation.VisibleForTesting
 import app.passwordstore.crypto.KeyUtils.isKeyUsable
+import app.passwordstore.crypto.KeyUtils.tryGetAllIds
 import app.passwordstore.crypto.KeyUtils.tryGetId
 import app.passwordstore.crypto.KeyUtils.tryParseKeyring
 import app.passwordstore.crypto.errors.InvalidKeyException
@@ -101,8 +102,8 @@ constructor(filesDir: String, private val dispatcher: CoroutineDispatcher) :
             is PGPIdentifier.KeyId -> {
               val keyIdMatch =
                 keys
-                  .map { key -> key to tryGetId(key) }
-                  .firstOrNull { (_, keyId) -> keyId?.id == id.id }
+                  .map { key -> key to tryGetAllIds(key) }
+                  .firstOrNull { (_, keyIds) -> keyIds.any { keyId -> keyId.id == id.id } }
               keyIdMatch?.first
             }
             is PGPIdentifier.UserId -> {

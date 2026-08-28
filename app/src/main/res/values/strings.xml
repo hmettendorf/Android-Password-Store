@@ -111,7 +111,11 @@
   <string name="pref_copy_title">Automatically copy password</string>
   <string name="pref_copy_summary">Automatically copy the password to the clipboard after decryption was successful.</string>
   <string name="pref_auto_push_title">Auto push</string>
-  <string name="pref_auto_push_summary">Push to the remote right after saving a password. Has no effect until a Git remote is configured.</string>
+  <string name="pref_auto_push_summary">Offer to push to the remote right after saving a password. The push is always confirmed first. Has no effect until a Git remote is configured.</string>
+  <string name="auto_push_confirm_title">Push to the remote?</string>
+  <string name="auto_push_confirm_message">The password was saved and committed. Push it to the remote now?</string>
+  <string name="auto_push_confirm_push">Push</string>
+  <string name="auto_push_confirm_later">Not now</string>
   <string name="auto_push_error_dialog_title">The password was saved but could not be pushed</string>
   <string name="ssh_key_import_error_not_an_ssh_key_message">Selected file does not appear to be an SSH private key.</string>
   <string name="ssh_key_success_dialog_title">SSH-key imported</string>
@@ -309,6 +313,9 @@
   <string name="preference_custom_public_suffixes_hint">company.com\npersonal.com</string>
 
   <!-- Password creation failure -->
+  <string name="password_creation_encrypt_fail_title">The password was not saved</string>
+  <string name="password_creation_encrypt_fail_message">%1$s\n\nNothing was written, so any existing entry is unchanged. Import the missing keys under Settings → PGP, or remove them from the store\'s .gpg-id file.</string>
+  <string name="password_creation_encrypt_fail_unknown_reason">The password could not be encrypted.</string>
   <string name="password_creation_file_fail_title">Error</string>
   <string name="password_creation_file_write_fail_message">Failed to write password file to the store, please try again.</string>
   <string name="password_creation_file_delete_fail_message">Failed to delete password file %1$s from the store, please delete it manually.</string>

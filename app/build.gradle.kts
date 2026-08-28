@@ -93,6 +93,7 @@ dependencies {
   nonFreeImplementation(libs.thirdparty.nonfree.sentry)
   freeImplementation(projects.sentryStub)
 
+  testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.testing.robolectric)
   testImplementation(libs.testing.sharedPrefsMock)
   testImplementation(libs.bundles.testDependencies)
