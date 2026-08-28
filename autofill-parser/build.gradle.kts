@@ -8,6 +8,7 @@ plugins {
   id("com.github.android-password-store.published-android-library")
   id("com.github.android-password-store.kotlin-android")
   id("com.github.android-password-store.psl-plugin")
+  id("com.github.android-password-store.dokka")
 }
 
 android {

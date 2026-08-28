@@ -17,6 +17,10 @@ gradlePlugin {
       id = "com.github.android-password-store.android-library"
       implementationClass = "app.passwordstore.gradle.LibraryPlugin"
     }
+    register("dokka") {
+      id = "com.github.android-password-store.dokka"
+      implementationClass = "app.passwordstore.gradle.DokkaPlugin"
+    }
     register("git-hooks") {
       id = "com.github.android-password-store.git-hooks"
       implementationClass = "app.passwordstore.gradle.GitHooksPlugin"
@@ -72,6 +76,7 @@ dependencies {
   implementation(platform(libs.kotlin.bom))
   implementation(libs.build.agp)
   implementation(libs.build.diffutils)
+  implementation(libs.build.dokka)
   implementation(libs.build.download)
   implementation(libs.build.javapoet)
   implementation(libs.build.kotlin)

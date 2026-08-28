@@ -1,7 +1,15 @@
 # Password Store
 
-[![GitHub workflow](https://github.com/android-password-store/Android-Password-Store/workflows/Deploy%20snapshot%20builds/badge.svg)](https://github.com/android-password-store/Android-Password-Store/actions)
+[![CI](https://github.com/hmettendorf/Android-Password-Store/actions/workflows/ci.yml/badge.svg)](https://github.com/hmettendorf/Android-Password-Store/actions/workflows/ci.yml)
 ![Backers on Open Collective](https://opencollective.com/Android-Password-Store/backers/badge.svg) ![Sponsors on Open Collective](https://opencollective.com/Android-Password-Store/sponsors/badge.svg)
+
+## About this fork
+
+This is a fork of [android-password-store/Android-Password-Store](https://github.com/android-password-store/Android-Password-Store), the Android client for [pass](https://www.passwordstore.org/). The original project [stopped development in October 2024](https://github.com/android-password-store/Android-Password-Store/discussions/3260) and its repository is archived. Everything here up to that point is the work of the original authors, under the same GPL-3.0 licence; this fork continues from where they left off.
+
+It is an independent continuation, not an official successor, and it is not endorsed by or affiliated with the original maintainers. Please bring issues here rather than to the upstream repository — nobody is reading them there.
+
+**It is signed with a different key than the original app.** Android will refuse to install it over an existing Password Store installation, and the two cannot be upgraded into one another. To switch, export your passwords first, or simply keep using your existing Git remote: this fork stores exactly the same GPG-encrypted files in exactly the same layout, so a fresh install can clone your store and carry on.
 
 ## What's new in this fork
 
@@ -30,6 +38,7 @@ Upstream development stopped in October 2024. This fork picks the project back u
 ### Build and tooling
 
 * **Toolchain and dependencies brought forward.** Gradle 9.5.1, AGP 8.13.2, Kotlin 2.2.21, `compileSdk` 36, BouncyCastle 1.85, plus current AndroidX, Compose, Hilt and coroutines. `targetSdk` deliberately stays at 34, so there are no runtime behaviour changes from the upgrade itself.
+* **API documentation, generated and published.** Dokka 2.2.0 aggregates the library modules -- `autofill-parser`, `coroutine-utils`, `crypto`, `format` and `passgen` -- into one cross-linked site, with every symbol linking back to its source line on GitHub. `docs.yml` builds it on each push and deploys to GitHub Pages through the artifact flow, so there is no `gh-pages` branch and no token to manage. Pull requests build the docs without deploying, so a broken build surfaces on the PR.
 * **Dependency updates run themselves again.** Upstream's Renovate config was left behind without a bot to execute it. `renovate.yml` runs Renovate on a schedule from the repository itself, and validates the config on every PR that touches it. The config has been migrated to current Renovate, which removed `config:base`, `matchPackagePatterns` and `regexManagers`. Requires a `RENOVATE_TOKEN` secret.
 * **CI that runs on a fork.** Every workflow used to depend on a reusable workflow in the now-archived upstream repository. `ci.yml` inlines those steps and runs Spotless, the unit tests, the API compatibility check and both debug APK builds without needing any secrets. Workflows that require upstream secrets are kept but no longer trigger automatically.
 
