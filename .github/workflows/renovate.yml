@@ -1,0 +1,95 @@
+on:
+  schedule:
+    # Off the hour: GitHub delays cron runs that land in the top-of-hour rush.
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: Renovate log level
+        type: choice
+        default: info
+        options:
+          - info
+          - debug
+      dryRun:
+        description: Report what would happen without opening PRs
+        type: boolean
+        default: false
+  # Config changes are validated on the PR that makes them, so a typo cannot sit
+  # unnoticed until the next scheduled run.
+  pull_request:
+    paths:
+      - .github/renovate.json5
+      - .github/workflows/renovate.yml
+
+name: Renovate
+
+# Only ever one bot run at a time, and never cancel one midway: Renovate is not
+# transactional, and a killed run can leave half-created branches behind.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  # The validator and the bot are held to one version, so a config that passes
+  # here is a config the scheduled run will accept.
+  RENOVATE_VERSION: 44.49.0
+
+jobs:
+  validate-config:
+    name: Validate config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          # Renovate 44 declares engines.node ^24.11.0.
+          node-version: 24
+
+      # No file argument: the validator then auto-detects .github/renovate.json5
+      # and checks it as a repository config rather than a global one.
+      - name: Validate Renovate config
+        run: npx --yes --package renovate@${{ env.RENOVATE_VERSION }} -- renovate-config-validator --strict
+
+  renovate:
+    name: Run Renovate
+    needs: validate-config
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      # The dependency dashboard is an issue.
+      issues: write
+    steps:
+      # Deliberately a hard failure rather than a GITHUB_TOKEN fallback. PRs
+      # opened with GITHUB_TOKEN do not trigger workflows, so ci.yml would never
+      # run on them -- and renovate.json5 automerges minor and patch updates on a
+      # green branch, which with no checks at all means unreviewed, untested
+      # merges. Use a PAT (repo + workflow scope) or a GitHub App token.
+      - name: Require a bot token
+        env:
+          RENOVATE_TOKEN: ${{ secrets.RENOVATE_TOKEN }}
+        run: |
+          if [ -z "$RENOVATE_TOKEN" ]; then
+            echo "::error::RENOVATE_TOKEN is not set. Add a PAT with repo and workflow scope as a repository secret named RENOVATE_TOKEN."
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@v46.2.4
+        with:
+          token: ${{ secrets.RENOVATE_TOKEN }}
+          renovate-version: ${{ env.RENOVATE_VERSION }}
+        env:
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          RENOVATE_PLATFORM: github
+          # Renovate reads .github/renovate.json5 from the repository itself.
+          LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
+          RENOVATE_DRY_RUN: ${{ inputs.dryRun && 'full' || 'null' }}
