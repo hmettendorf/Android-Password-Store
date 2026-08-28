@@ -309,6 +309,9 @@
   <string name="preference_custom_public_suffixes_hint">company.com\npersonal.com</string>
 
   <!-- Password creation failure -->
+  <string name="password_creation_encrypt_fail_title">The password was not saved</string>
+  <string name="password_creation_encrypt_fail_message">%1$s\n\nNothing was written, so any existing entry is unchanged. Import the missing keys under Settings → PGP, or remove them from the store\'s .gpg-id file.</string>
+  <string name="password_creation_encrypt_fail_unknown_reason">The password could not be encrypted.</string>
   <string name="password_creation_file_fail_title">Error</string>
   <string name="password_creation_file_write_fail_message">Failed to write password file to the store, please try again.</string>
   <string name="password_creation_file_delete_fail_message">Failed to delete password file %1$s from the store, please delete it manually.</string>

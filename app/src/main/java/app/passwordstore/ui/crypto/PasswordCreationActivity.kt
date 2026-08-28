@@ -44,6 +44,7 @@ import app.passwordstore.util.git.operation.PushOperation
 import app.passwordstore.util.settings.DirectoryStructure
 import app.passwordstore.util.settings.GitSettings
 import app.passwordstore.util.settings.PreferenceKeys
+import com.github.michaelbull.result.getOrElse
 import com.github.michaelbull.result.onErr
 import com.github.michaelbull.result.onOk
 import com.github.michaelbull.result.runCatching
@@ -385,11 +386,33 @@ class PasswordCreationActivity : BasePGPActivity() {
 
       lifecycleScope.launch(dispatcherProvider.main()) {
         runCatching {
-            val result =
+            val encrypted =
               withContext(dispatcherProvider.io()) {
-                val outputStream = ByteArrayOutputStream()
-                repository.encrypt(gpgIdentifiers, content.byteInputStream(), outputStream)
-                outputStream
+                repository.encrypt(
+                  gpgIdentifiers,
+                  content.byteInputStream(),
+                  ByteArrayOutputStream(),
+                )
+              }
+            // The result used to be dropped and the output stream written regardless, so a failed
+            // encryption produced an empty .gpg file that reported success.
+            val result =
+              encrypted.getOrElse { error ->
+                logcat(ERROR) { error.asLog("Failed to encrypt password") }
+                setResult(RESULT_CANCELED)
+                MaterialAlertDialogBuilder(this@PasswordCreationActivity)
+                  .setTitle(R.string.password_creation_encrypt_fail_title)
+                  .setMessage(
+                    getString(
+                      R.string.password_creation_encrypt_fail_message,
+                      error.message
+                        ?: getString(R.string.password_creation_encrypt_fail_unknown_reason),
+                    )
+                  )
+                  .setCancelable(false)
+                  .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
+                  .show()
+                return@runCatching
               }
             val passwordFile = Paths.get(path)
             // If we're not editing, this file should not already exist!
